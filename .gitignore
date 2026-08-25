@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+
+# Node.js
+node_modules/
+dist/
+.next/
+out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Docker
+*.env.local
+
+# Prisma
+src/backend/prisma/*.db
+
+# Build artifacts
+src/frontend/dist/
+src/backend/dist/
