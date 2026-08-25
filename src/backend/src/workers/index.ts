@@ -1,15 +1,28 @@
 import { Queue, Worker } from 'bullmq';
-import { redis } from '../services/redis.js';
 import { prisma } from '../services/db.js';
 import { logger } from '../services/logger.js';
 import axios from 'axios';
+import IORedis from 'ioredis';
 
-// ── Queues ────────────────────────────────────────────────
-export const messageQueue = new Queue('messages', { connection: redis as any });
-export const syncQueue = new Queue('sync', { connection: redis as any });
+// Lazy queues — only created when Redis is reachable
+export let messageQueue: Queue;
+export let syncQueue: Queue;
+
+let redisConn: IORedis | null = null;
+
+const getRedis = () => {
+  if (!redisConn) {
+    redisConn = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      lazyConnect: true,
+    });
+  }
+  return redisConn;
+};
 
 // ── WhatsApp message processor ────────────────────────────
-const whatsappWorker = new Worker(
+const startWhatsappWorker = () => new Worker(
   'messages',
   async (job) => {
     if (job.name !== 'process-whatsapp') return;
@@ -87,18 +100,19 @@ const whatsappWorker = new Worker(
 
     // 6. Push real-time to frontend
     // io is not directly accessible in workers — use Redis pub/sub
-    await redis.publish(`tenant:${tenantId}:events`, JSON.stringify({
+    // Redis pub/sub for real-time — skip if not connected
+    try { redisConn?.publish(`tenant:${tenantId}:events`, JSON.stringify({
       event: 'new_message',
       data: { channel: 'whatsapp', messageId: message.id, intent: aiIntent, party: party.name },
-    }));
+    })); } catch { /* ignore if Redis not available */ }
 
     logger.info('WhatsApp message processed', { tenantId, intent: aiIntent });
   },
-  { connection: redis as any, concurrency: 5 }
+  { connection: getRedis() as any, concurrency: 5 }
 );
 
 // ── Tally sync worker ─────────────────────────────────────
-const tallyWorker = new Worker(
+const startTallyWorker = () => new Worker(
   'sync',
   async (job) => {
     if (job.name !== 'tally-sync') return;
@@ -119,13 +133,25 @@ const tallyWorker = new Worker(
 
     logger.info('Tally sync completed', { tenantId });
   },
-  { connection: redis as any }
+  { connection: getRedis() as any }
 );
 
-whatsappWorker.on('failed', (job, err) => logger.error('WhatsApp worker failed', { job: job?.id, err }));
-tallyWorker.on('failed', (job, err) => logger.error('Tally worker failed', { job: job?.id, err }));
-
 export const initQueues = async () => {
-  await redis.connect();
-  logger.info('✅ Queues ready — messageQueue, syncQueue');
+  try {
+    const conn = getRedis();
+    await conn.connect();
+
+    messageQueue = new Queue('messages', { connection: conn as any });
+    syncQueue    = new Queue('sync',     { connection: conn as any });
+
+    const wa    = startWhatsappWorker();
+    const tally = startTallyWorker();
+
+    wa.on('failed',    (job, err) => logger.error('WhatsApp worker failed', { job: job?.id, err }));
+    tally.on('failed', (job, err) => logger.error('Tally worker failed',    { job: job?.id, err }));
+
+    logger.info('✅ Queues ready — messageQueue, syncQueue');
+  } catch (err) {
+    logger.warn('⚠️  Redis not available — queues disabled (WhatsApp/Tally sync will not work in dev)', { err });
+  }
 };

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
-import { redis } from '../../services/redis.js';
 import { messageQueue } from '../../workers/index.js';
+import { logger } from '../../services/logger.js';
 
 export const whatsappWebhookRouter = Router();
 
@@ -39,12 +39,7 @@ whatsappWebhookRouter.post('/', async (req, res) => {
         if (!messages?.length) continue;
 
         for (const msg of messages) {
-          // Prevent duplicate processing
-          const dedupKey = `wa:msg:${msg.id}`;
-          const exists = await redis.get(dedupKey);
-          if (exists) continue;
-          await redis.set(dedupKey, '1', 'EX', 86400);
-
+          if (!messageQueue) { logger.warn('messageQueue not ready, skipping WhatsApp message'); continue; }
           await messageQueue.add('process-whatsapp', {
             externalId: msg.id,
             from: msg.from,
