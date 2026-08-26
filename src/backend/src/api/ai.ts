@@ -28,59 +28,66 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
     products,
     leads,
     recentMessages,
+    whatsappSignals,
   ] = await Promise.all([
-    // Today's sales
     prisma.transaction.aggregate({
       where: { tenantId, type: 'SALE', date: { gte: today, lte: todayEnd } },
       _sum: { totalAmount: true, paidAmount: true },
       _count: true,
     }),
-    // This month's sales
     prisma.transaction.aggregate({
       where: { tenantId, type: 'SALE', date: { gte: monthStart } },
       _sum: { totalAmount: true, paidAmount: true },
       _count: true,
     }),
-    // This month's purchases (cost)
     prisma.transaction.aggregate({
       where: { tenantId, type: 'PURCHASE', date: { gte: monthStart } },
       _sum: { totalAmount: true },
       _count: true,
     }),
-    // Pending/partial payments (customers who owe money)
     prisma.transaction.findMany({
       where: { tenantId, type: 'SALE', status: { in: ['PENDING', 'PARTIAL'] } },
       include: { party: true },
       orderBy: { totalAmount: 'desc' },
       take: 10,
     }),
-    // All products with stock
     prisma.product.findMany({
       where: { tenantId, isActive: true },
       orderBy: { currentStock: 'asc' },
     }),
-    // Active leads
     prisma.lead.findMany({
       where: { tenantId, status: { notIn: ['WON', 'LOST'] } },
       include: { party: true },
       orderBy: { createdAt: 'desc' },
     }),
-    // Recent unread messages
     prisma.message.findMany({
       where: { tenantId, isRead: false },
       include: { party: true },
       orderBy: { createdAt: 'desc' },
       take: 5,
     }),
+    // WhatsApp messages with buying signals — full data for lead detection
+    prisma.message.findMany({
+      where: {
+        tenantId,
+        channel: 'WHATSAPP',
+        direction: 'INBOUND',
+        aiIntent: { in: ['quote_request', 'new_customer_inquiry', 'bulk_inquiry', 'catalogue_request', 'order_confirm', 'sample_request'] },
+        createdAt: { gte: new Date(Date.now() - 30 * 86400000) },
+      },
+      include: { party: true },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    }),
   ]);
 
   const fmt = (n: any) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
   const todayDateStr = today.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-  const monthlySalesAmt   = Number(monthSales._sum.totalAmount || 0);
+  const monthlySalesAmt    = Number(monthSales._sum.totalAmount || 0);
   const monthlyPurchaseAmt = Number(monthPurchases._sum.totalAmount || 0);
-  const monthlyProfit     = monthlySalesAmt - monthlyPurchaseAmt;
-  const profitMargin      = monthlySalesAmt > 0 ? ((monthlyProfit / monthlySalesAmt) * 100).toFixed(1) : '0';
+  const monthlyProfit      = monthlySalesAmt - monthlyPurchaseAmt;
+  const profitMargin       = monthlySalesAmt > 0 ? ((monthlyProfit / monthlySalesAmt) * 100).toFixed(1) : '0';
 
   const productLines = products.map((p) =>
     `  • ${p.name} (${p.code}): stock=${Number(p.currentStock)} ${p.unit}, sell=₹${Number(p.saleRate)}, buy=₹${Number(p.purchaseRate)}${Number(p.currentStock) <= Number(p.reorderLevel) ? ' ⚠️ LOW STOCK' : ''}`
@@ -97,6 +104,53 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
   const msgLines = recentMessages.map((m) =>
     `  • ${m.party?.name || m.fromAddress} (${m.channel}): "${m.content?.slice(0, 80)}" [intent: ${m.aiIntent}]`
   ).join('\n');
+
+  // ── Build detailed WhatsApp potential customer list ─────────────────────────
+  // Group by sender, carry score + signals from stored aiEntities JSON
+  const waSenderMap = new Map<string, {
+    name: string; phone: string; intents: string[]; messages: string[];
+    score: number; signals: string[]; product?: string; quantity?: string; city?: string;
+  }>();
+
+  for (const m of whatsappSignals) {
+    const key = m.fromAddress || 'unknown';
+    if (!waSenderMap.has(key)) {
+      waSenderMap.set(key, {
+        name: m.party?.name || key,
+        phone: key,
+        intents: [], messages: [], score: 0, signals: [],
+      });
+    }
+    const s = waSenderMap.get(key)!;
+    if (m.aiIntent && !s.intents.includes(m.aiIntent)) s.intents.push(m.aiIntent);
+    if (m.content) s.messages.push(m.content.slice(0, 80));
+
+    const ent = m.aiEntities as any;
+    if (ent) {
+      if (ent.customerScore > s.score) s.score = ent.customerScore;
+      if (ent.customerSignals) {
+        for (const sig of ent.customerSignals) {
+          if (!s.signals.includes(sig)) s.signals.push(sig);
+        }
+      }
+      if (ent.product && !s.product) s.product = ent.product;
+      if (ent.quantity && !s.quantity) s.quantity = ent.quantity;
+      if (ent.city && !s.city) s.city = ent.city;
+    }
+  }
+
+  // Sort by score descending
+  const waSenders = Array.from(waSenderMap.values()).sort((a, b) => b.score - a.score);
+
+  // Format for AI context — include JSON-like structure the chatbot can parse and present
+  const waLeadLines = waSenders.map((s, i) => {
+    const urgency = s.intents.includes('order_confirm') ? '🔥 HOT' : s.score >= 70 ? '⭐ HIGH' : '· MOD';
+    return `  ${i + 1}. [${urgency}] ${s.name} (${s.phone})
+     Intent: ${s.intents.join(' + ')} | Score: ${s.score}/100
+     Signals: ${s.signals.length ? s.signals.join(', ') : 'buying interest'}
+     Product: ${s.product || 'general inquiry'} | Qty: ${s.quantity || 'not specified'} | City: ${s.city || 'unknown'}
+     Message: "${s.messages[0] || ''}"`;
+  }).join('\n');
 
   return `=== LIVE BUSINESS DATA for GSpaces AI CRM (as of ${todayDateStr}) ===
 
@@ -121,6 +175,9 @@ ${leadLines || '  None'}
 UNREAD MESSAGES (${recentMessages.length}):
 ${msgLines || '  None'}
 
+WHATSAPP POTENTIAL CUSTOMERS — ${waSenders.length} people messaged with buying signals (last 30 days):
+${waLeadLines || '  None detected'}
+
 === END LIVE DATA ===`;
 }
 
@@ -141,6 +198,16 @@ Instructions:
 - Be concise and direct — the owner is busy
 - For pending payments, list party names and amounts
 - For stock questions, give exact quantities and flag LOW STOCK items
+
+WHATSAPP LEAD DETECTION RULES:
+- When asked about WhatsApp leads or potential customers, look at the "WHATSAPP POTENTIAL CUSTOMERS" section
+- For each person, explain: their name/phone, what they asked, their buying signals, recommended action
+- Highlight 🔥 HOT leads (score 70+) first, then ⭐ HIGH (50-70), then moderate
+- Always end WhatsApp lead answers with: "LEAD_DATA_JSON:" followed by a JSON array of top leads like:
+  [{"name":"Ravi Gupta","phone":"9800000001","intent":"quote_request","product":"georgette","score":85,"signals":["asking price","bulk qty"],"recommendation":"Create lead immediately"}]
+- This JSON format helps the UI display lead cards
+- If no WhatsApp leads exist, suggest using the Simulate WhatsApp feature in the Inbox page
+
 - Today's date: ${today}`;
 }
 
@@ -151,7 +218,6 @@ aiRouter.post('/chat', async (req, res, next) => {
     const body     = chatSchema.parse(req.body);
     const sessionId = body.sessionId ?? crypto.randomUUID();
 
-    // Build message list with live DB context in system prompt
     const systemContent = await buildSystemPrompt(tenantId);
     const history       = (body.history || []).slice(-8);
 
@@ -163,7 +229,7 @@ aiRouter.post('/chat', async (req, res, next) => {
 
     const orRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
-      { model: OPENROUTER_MODEL, messages, temperature: 0.2, max_tokens: 1000 },
+      { model: OPENROUTER_MODEL, messages, temperature: 0.2, max_tokens: 1200 },
       {
         headers: {
           Authorization:  `Bearer ${OPENROUTER_API_KEY}`,
@@ -175,10 +241,20 @@ aiRouter.post('/chat', async (req, res, next) => {
       }
     );
 
-    const response   = orRes.data.choices[0].message.content || '';
-    const tokensUsed = orRes.data.usage?.total_tokens ?? null;
+    const rawResponse = orRes.data.choices[0].message.content || '';
+    const tokensUsed  = orRes.data.usage?.total_tokens ?? null;
 
-    return res.json({ sessionId, response, tokensUsed, sqlQuery: null });
+    // Extract lead JSON if present (for UI card rendering)
+    let leadCards: any[] | null = null;
+    const jsonMatch = rawResponse.match(/LEAD_DATA_JSON:\s*(\[[\s\S]*?\])/);
+    if (jsonMatch) {
+      try { leadCards = JSON.parse(jsonMatch[1]); } catch { /* ignore */ }
+    }
+
+    // Strip the JSON tag from the displayed response
+    const response = rawResponse.replace(/LEAD_DATA_JSON:[\s\S]*$/, '').trim();
+
+    return res.json({ sessionId, response, tokensUsed, sqlQuery: null, leadCards });
   } catch (err) {
     next(err);
   }
@@ -190,7 +266,7 @@ aiRouter.get('/suggestions', async (req, res, next) => {
     const tenantId   = (req as any).user.tenantId;
     const liveData   = await fetchLiveContext(tenantId);
 
-    const prompt = `Based on this real business data:\n${liveData}\n\nGenerate 3-5 specific, actionable morning suggestions in Hinglish for the owner. Use actual party names and amounts from the data. Return as JSON array of strings only.`;
+    const prompt = `Based on this real business data:\n${liveData}\n\nGenerate 3-5 specific, actionable morning suggestions in Hinglish for the owner. Include any hot WhatsApp leads that need follow-up. Use actual party names and amounts from the data. Return as JSON array of strings only.`;
 
     const orRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',

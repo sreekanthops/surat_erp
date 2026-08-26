@@ -197,6 +197,7 @@ npm run dev
 
 | File | Description |
 |---|---|
+| [`docs/whatsapp-setup.md`](docs/whatsapp-setup.md) | **📱 WhatsApp Business API — complete beginner setup guide** |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture deep-dive |
 | [`docs/features.md`](docs/features.md) | Feature specifications per module |
 | [`docs/integrations.md`](docs/integrations.md) | WhatsApp, Gmail, Tally, ERP integration guide |

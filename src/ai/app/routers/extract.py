@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from app.services.extractor import MessageExtractor
 
 router = APIRouter()
@@ -17,6 +17,9 @@ class ExtractResponse(BaseModel):
     entities: dict
     language: str
     sentiment: str
+    is_potential_customer: bool = False
+    customer_score: int = 0
+    customer_signals: List[str] = []
 
 
 @router.post("/extract-message-entities", response_model=ExtractResponse)

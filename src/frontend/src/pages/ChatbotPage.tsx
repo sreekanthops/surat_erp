@@ -1,26 +1,177 @@
 import { useState, useRef, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
 import { Send, Bot, User } from 'lucide-react';
 
-interface Message { role: 'user' | 'assistant'; content: string; }
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  leadCards?: LeadCard[] | null;
+}
+
+interface LeadCard {
+  name: string;
+  phone: string;
+  intent: string;
+  product?: string;
+  score: number;
+  signals: string[];
+  recommendation: string;
+}
 
 const suggestions = [
   'Aaj ki sale kitni hai?',
+  'WhatsApp pe kaun customer ban sakta hai?',
   'Is mahine ka profit kya hai?',
   'Georgette ka stock kitna hai?',
-  'Top 5 customers this month?',
   'Pending payments list karo',
+  'Hot WhatsApp leads dikhao',
 ];
 
+// ── WhatsApp icon ─────────────────────────────────────────────────────────────
+const WA_ICON = () => (
+  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style={{ flexShrink: 0 }}>
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+);
+
+// ── Score colour helpers ───────────────────────────────────────────────────────
+const scoreColor = (s: number) => s >= 70 ? '#16a34a' : s >= 50 ? '#f97316' : '#64748b';
+const scoreBg    = (s: number) => s >= 70 ? '#f0fdf4' : s >= 50 ? '#fff7ed' : '#f8fafc';
+const intentLabel: Record<string, string> = {
+  quote_request: 'Quote Request', order_confirm: 'Order Confirm',
+  bulk_inquiry: 'Bulk Inquiry', catalogue_request: 'Catalogue',
+  new_customer_inquiry: 'New Inquiry', sample_request: 'Sample Req',
+  general: 'General',
+};
+
+// ── WhatsApp Lead Card ────────────────────────────────────────────────────────
+function LeadCardBlock({ card, onConvert }: { card: LeadCard; onConvert: (card: LeadCard) => void }) {
+  return (
+    <div style={{
+      background: '#fff', border: `1.5px solid ${scoreColor(card.score)}33`,
+      borderLeft: `4px solid ${scoreColor(card.score)}`,
+      borderRadius: 10, padding: '10px 12px', marginTop: 6, fontSize: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: '#16a34a' }}><WA_ICON /></span>
+          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 13 }}>{card.name}</span>
+          <span style={{ fontSize: 11, color: '#64748b' }}>{card.phone}</span>
+        </div>
+        <div style={{
+          background: scoreBg(card.score), border: `1px solid ${scoreColor(card.score)}44`,
+          borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: scoreColor(card.score),
+        }}>
+          {card.score}/100
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, background: '#eff6ff', color: '#2563eb', fontWeight: 600 }}>
+          {intentLabel[card.intent] || card.intent}
+        </span>
+        {card.product && (
+          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, background: '#f5f3ff', color: '#7c3aed', fontWeight: 600 }}>
+            {card.product}
+          </span>
+        )}
+        {card.signals.slice(0, 2).map(s => (
+          <span key={s} style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, background: '#fefce8', color: '#ca8a04', fontWeight: 500 }}>
+            {s}
+          </span>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontSize: 11, color: scoreColor(card.score), fontWeight: 600 }}>{card.recommendation}</span>
+        <button
+          onClick={() => onConvert(card)}
+          style={{
+            padding: '4px 10px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+            border: 'none', borderRadius: 7, color: '#fff', fontSize: 11, fontWeight: 700,
+            cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          + Lead
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Convert Lead Modal ────────────────────────────────────────────────────────
+function ConvertLeadModal({ card, onClose, onSuccess }: { card: LeadCard; onClose: () => void; onSuccess: () => void }) {
+  const [title, setTitle]       = useState(`WhatsApp — ${card.product || card.intent} — ${new Date().toLocaleDateString('en-IN')}`);
+  const [product, setProduct]   = useState(card.product || '');
+  const [value, setValue]       = useState('');
+  const qc = useQueryClient();
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.get(`/api/v1/messages/inbox?limit=100`).then(async r => {
+        // Find the latest message from this phone number
+        const msg = (r.data?.data || []).find((m: any) => m.fromAddress === card.phone);
+        if (!msg) throw new Error('Message not found in inbox');
+        return api.patch(`/api/v1/messages/${msg.id}/convert-lead`, {
+          title, productInterest: product, estimatedValue: value ? parseFloat(value) : undefined,
+          notes: card.signals.length ? `Signals: ${card.signals.join(', ')}` : undefined,
+        }).then(r => r.data);
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inbox'] });
+      qc.invalidateQueries({ queryKey: ['potential-leads'] });
+      onSuccess();
+      onClose();
+    },
+  });
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#fff', borderRadius: 18, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', margin: '0 0 4px' }}>Convert to Lead</h2>
+        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 18px' }}>
+          <strong>{card.name}</strong> · {card.phone} via WhatsApp
+        </p>
+        {[
+          { label: 'Lead Title', val: title, set: setTitle, ph: 'e.g. Ravi Gupta — Georgette inquiry' },
+          { label: 'Product Interest', val: product, set: setProduct, ph: 'e.g. Georgette 4-Way' },
+          { label: 'Estimated Value (₹)', val: value, set: setValue, ph: '50000' },
+        ].map(f => (
+          <div key={f.label} style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>
+            <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+              style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 9, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+        ))}
+        {mut.isError && <p style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>Could not find message in inbox — go to Inbox tab first.</p>}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', border: '1.5px solid #e2e8f0', borderRadius: 9, background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={() => mut.mutate()} disabled={mut.isPending}
+            style={{ padding: '8px 16px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: 9, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            {mut.isPending ? 'Creating...' : '🎯 Create Lead'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main ChatbotPage ──────────────────────────────────────────────────────────
 export default function ChatbotPage() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Namaste! Main aapka AI business assistant hoon. Aap mujhse apne business ke baare mein kuch bhi pooch sakte hain — Hindi ya English mein. 🙏' },
+    {
+      role: 'assistant',
+      content: 'Namaste! Main aapka AI business assistant hoon. Aap mujhse apne business ke baare mein kuch bhi pooch sakte hain.\n\n💡 WhatsApp pe aaye messages mein se potential customers detect karne ke liye poochein: "WhatsApp pe kaun customer ban sakta hai?"',
+    },
   ]);
-  const [input, setInput] = useState('');
+  const [input, setInput]         = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [convertCard, setConvertCard] = useState<LeadCard | null>(null);
+  const [convertSuccess, setConvertSuccess] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
 
   const mutation = useMutation({
     mutationFn: (message: string) =>
@@ -31,7 +182,10 @@ export default function ChatbotPage() {
       }).then((r) => r.data),
     onSuccess: (data) => {
       setSessionId(data.sessionId);
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.response }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.response, leadCards: data.leadCards },
+      ]);
     },
     onError: (err: any) => {
       const status = err?.response?.status;
@@ -68,7 +222,7 @@ export default function ChatbotPage() {
           </div>
           <div>
             <h1 className="text-sm font-bold text-gray-900 leading-tight">AI Business Assistant</h1>
-            <p className="text-xs text-gray-400 leading-tight">Hindi / English mein poochein</p>
+            <p className="text-xs text-gray-400 leading-tight">WhatsApp leads · Sales · Stock · Payments</p>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
@@ -89,12 +243,31 @@ export default function ChatbotPage() {
                 : <Bot size={13} className="text-blue-600" />
               }
             </div>
-            <div className={`max-w-[76%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-              msg.role === 'user'
-                ? 'bg-blue-600 text-white rounded-tr-sm shadow-sm'
-                : 'bg-white border border-gray-100 text-gray-900 rounded-tl-sm shadow-sm'
-            }`}>
-              {msg.content}
+            <div style={{ maxWidth: '76%' }}>
+              <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                msg.role === 'user'
+                  ? 'bg-blue-600 text-white rounded-tr-sm shadow-sm'
+                  : 'bg-white border border-gray-100 text-gray-900 rounded-tl-sm shadow-sm'
+              }`} style={{ whiteSpace: 'pre-wrap' }}>
+                {msg.content}
+              </div>
+
+              {/* ── WhatsApp Lead Cards (only on assistant messages) ── */}
+              {msg.role === 'assistant' && msg.leadCards && msg.leadCards.length > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 4, paddingLeft: 2 }}>
+                    📱 {msg.leadCards.length} WhatsApp Lead{msg.leadCards.length > 1 ? 's' : ''} Detected
+                  </div>
+                  {msg.leadCards.map((card, ci) => (
+                    <LeadCardBlock key={ci} card={card} onConvert={setConvertCard} />
+                  ))}
+                  {convertSuccess && (
+                    <div style={{ marginTop: 6, padding: '6px 10px', background: '#f0fdf4', borderRadius: 8, fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
+                      ✅ {convertSuccess}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -141,7 +314,7 @@ export default function ChatbotPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder="Kuch bhi poochein apne business ke baare mein..."
+            placeholder="Kuch bhi poochein — WhatsApp leads, sales, stock..."
             className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white"
           />
           <button
@@ -153,6 +326,15 @@ export default function ChatbotPage() {
           </button>
         </div>
       </div>
+
+      {/* Convert Lead Modal */}
+      {convertCard && (
+        <ConvertLeadModal
+          card={convertCard}
+          onClose={() => setConvertCard(null)}
+          onSuccess={() => setConvertSuccess(`Lead created for ${convertCard.name}!`)}
+        />
+      )}
     </div>
   );
 }

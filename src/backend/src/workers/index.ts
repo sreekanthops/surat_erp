@@ -48,10 +48,14 @@ const startWhatsappWorker = () => new Worker(
       });
     }
 
-    // 3. AI extraction
+    // 3. AI extraction (enriched — intent + score + signals)
     let aiIntent = 'general';
-    let aiEntities = {};
+    let aiEntities: any = {};
     let aiLanguage = 'hi';
+    let aiSentiment = 'neutral';
+    let isPotentialCustomer = false;
+    let customerScore = 0;
+    let customerSignals: string[] = [];
 
     try {
       const aiRes = await axios.post(
@@ -59,14 +63,23 @@ const startWhatsappWorker = () => new Worker(
         { content, type },
         { timeout: 10000 }
       );
-      aiIntent = aiRes.data.intent;
-      aiEntities = aiRes.data.entities;
-      aiLanguage = aiRes.data.language;
+      aiIntent             = aiRes.data.intent;
+      aiEntities           = aiRes.data.entities || {};
+      aiLanguage           = aiRes.data.language;
+      aiSentiment          = aiRes.data.sentiment || 'neutral';
+      isPotentialCustomer  = aiRes.data.is_potential_customer || false;
+      customerScore        = aiRes.data.customer_score || 0;
+      customerSignals      = aiRes.data.customer_signals || [];
     } catch (err) {
       logger.warn('AI extraction failed, storing raw message', { err });
+      // keyword fallback
+      if (content && /rate|price|kitna|quote/i.test(content)) {
+        aiIntent = 'quote_request'; isPotentialCustomer = true; customerScore = 55;
+        customerSignals = ['asking price/rate'];
+      }
     }
 
-    // 4. Store message
+    // 4. Store message with enriched AI data
     const message = await prisma.message.create({
       data: {
         tenantId,
@@ -77,36 +90,43 @@ const startWhatsappWorker = () => new Worker(
         content,
         externalId,
         aiIntent,
-        aiEntities,
+        aiEntities: { ...aiEntities, customerScore, customerSignals },
         aiLanguage,
+        aiSentiment,
+        isRead: false,
       },
     });
 
-    // 5. Auto-create lead for quote requests
-    if (aiIntent === 'quote_request') {
-      await prisma.lead.create({
-        data: {
-          tenantId,
-          partyId: party.id,
-          sourceMessageId: message.id,
-          source: 'WHATSAPP',
-          status: 'NEW',
-          title: `WhatsApp inquiry — ${(aiEntities as any).product || 'product'} — ${new Date().toLocaleDateString('en-IN')}`,
-          productInterest: (aiEntities as any).product,
-          estimatedQty: (aiEntities as any).quantity ? parseFloat((aiEntities as any).quantity) : undefined,
-        },
+    // 5. Auto-create lead for buying signals (dedupe within 7 days)
+    const leadIntents = ['quote_request', 'new_customer_inquiry', 'bulk_inquiry', 'sample_request', 'order_confirm'];
+    if (leadIntents.includes(aiIntent) || isPotentialCustomer) {
+      const existing = await prisma.lead.findFirst({
+        where: { tenantId, partyId: party.id, source: 'WHATSAPP', createdAt: { gte: new Date(Date.now() - 7 * 86400000) } },
       });
+      if (!existing) {
+        await prisma.lead.create({
+          data: {
+            tenantId,
+            partyId: party.id,
+            sourceMessageId: message.id,
+            source: 'WHATSAPP',
+            status: 'NEW',
+            title: `WhatsApp — ${aiEntities.product || aiIntent.replace('_', ' ')} — ${new Date().toLocaleDateString('en-IN')}`,
+            productInterest: aiEntities.product,
+            estimatedQty: aiEntities.quantity ? parseFloat(aiEntities.quantity) : undefined,
+            notes: customerSignals.length ? `Signals: ${customerSignals.join(', ')}` : undefined,
+          },
+        });
+      }
     }
 
-    // 6. Push real-time to frontend
-    // io is not directly accessible in workers — use Redis pub/sub
-    // Redis pub/sub for real-time — skip if not connected
+    // 6. Push real-time to frontend via Redis pub/sub
     try { redisConn?.publish(`tenant:${tenantId}:events`, JSON.stringify({
-      event: 'new_message',
-      data: { channel: 'whatsapp', messageId: message.id, intent: aiIntent, party: party.name },
+      event: 'new_whatsapp_message',
+      data: { channel: 'whatsapp', messageId: message.id, intent: aiIntent, party: party.name, customerScore, isPotentialCustomer },
     })); } catch { /* ignore if Redis not available */ }
 
-    logger.info('WhatsApp message processed', { tenantId, intent: aiIntent });
+    logger.info('WhatsApp message processed', { tenantId, intent: aiIntent, customerScore });
   },
   { connection: getRedis() as any, concurrency: 5 }
 );
