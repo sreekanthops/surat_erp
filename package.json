@@ -1,0 +1,23 @@
+{
+  "name": "surat-textile-dashboard-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root package.json for Surat Textile Intelligence Dashboard",
+  "scripts": {
+    "install:backend": "npm install --prefix src/backend",
+    "install:frontend": "npm install --prefix src/frontend",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "postinstall": "npm run install:all",
+    "dev": "concurrently \"npm run dev --prefix src/backend\" \"npm run dev --prefix src/frontend\"",
+    "build": "npm run build --prefix src/backend && npm run build --prefix src/frontend",
+    "db:migrate": "npm run db:migrate --prefix src/backend",
+    "db:seed": "npm run db:seed --prefix src/backend",
+    "db:generate": "npm run db:generate --prefix src/backend",
+    "db:studio": "npm run db:studio --prefix src/backend",
+    "test": "npm run test --prefix src/backend && npm run test --prefix src/frontend",
+    "lint": "npm run lint --prefix src/backend && npm run lint --prefix src/frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

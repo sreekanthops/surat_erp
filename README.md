@@ -175,16 +175,19 @@ cd surat-textile-dashboard
 # 2. Copy environment variables
 cp .env.example .env
 
-# 3. Start with Docker Compose
+# 3. Install dependencies (installs both backend & frontend deps)
+npm install
+
+# 4. Start with Docker Compose
 docker-compose up -d
 
-# 4. Run database migrations
+# 5. Run database migrations
 npm run db:migrate
 
-# 5. Seed demo data
+# 6. Seed demo data
 npm run db:seed
 
-# 6. Start development
+# 7. Start development
 npm run dev
 ```
 
