@@ -3,12 +3,12 @@ import api from '@/hooks/useApi';
 import { MessageSquare, Mail } from 'lucide-react';
 
 const intentColors: Record<string, string> = {
-  quote_request: 'bg-blue-100 text-blue-700',
-  order_confirm: 'bg-green-100 text-green-700',
-  payment_info: 'bg-yellow-100 text-yellow-700',
-  complaint: 'bg-red-100 text-red-700',
-  delivery_query: 'bg-purple-100 text-purple-700',
-  general: 'bg-gray-100 text-gray-600',
+  quote_request:  'bg-blue-50 text-blue-600 border border-blue-100',
+  order_confirm:  'bg-green-50 text-green-600 border border-green-100',
+  payment_info:   'bg-yellow-50 text-yellow-600 border border-yellow-100',
+  complaint:      'bg-red-50 text-red-600 border border-red-100',
+  delivery_query: 'bg-violet-50 text-violet-600 border border-violet-100',
+  general:        'bg-gray-50 text-gray-500 border border-gray-100',
 };
 
 export default function InboxPage() {
@@ -18,59 +18,80 @@ export default function InboxPage() {
     refetchInterval: 30_000,
   });
 
+  const unreadCount = data?.data?.filter((m: any) => !m.isRead).length || 0;
+
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-3xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Inbox</h1>
-        <span className="text-sm text-gray-500">
-          {data?.data?.filter((m: any) => !m.isRead).length || 0} unread
-        </span>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 leading-tight">Inbox</h1>
+          {!isLoading && (
+            <p className="text-sm text-gray-400 mt-0.5">
+              {unreadCount > 0 ? `${unreadCount} unread messages` : 'All caught up'}
+            </p>
+          )}
+        </div>
+        {unreadCount > 0 && (
+          <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full">
+            {unreadCount} new
+          </span>
+        )}
       </div>
 
       {isLoading && (
         <div className="space-y-2">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-4 h-20 animate-pulse" />
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 h-20 animate-pulse" />
           ))}
         </div>
       )}
 
-      <div className="space-y-2">
-        {data?.data?.map((msg: any) => (
-          <div
-            key={msg.id}
-            className={`bg-white rounded-lg border p-4 flex gap-3 cursor-pointer hover:border-blue-300 transition-colors ${
-              !msg.isRead ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200'
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-              msg.channel === 'WHATSAPP' ? 'bg-green-100' : 'bg-blue-100'
-            }`}>
-              {msg.channel === 'WHATSAPP'
-                ? <MessageSquare size={14} className="text-green-600" />
-                : <Mail size={14} className="text-blue-600" />
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-semibold text-gray-900">
-                  {msg.party?.name || msg.fromAddress}
-                </span>
-                {msg.aiIntent && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${intentColors[msg.aiIntent] || intentColors.general}`}>
-                    {msg.aiIntent.replace('_', ' ')}
-                  </span>
-                )}
-                {!msg.isRead && <span className="w-2 h-2 bg-blue-500 rounded-full ml-auto" />}
+      {!isLoading && (
+        <div className="space-y-1.5">
+          {data?.data?.map((msg: any) => (
+            <div
+              key={msg.id}
+              className={`bg-white rounded-xl border p-4 flex gap-3 cursor-pointer hover:shadow-sm transition-all duration-150 ${
+                !msg.isRead ? 'border-blue-200 bg-blue-50/20' : 'border-gray-100 hover:border-gray-200'
+              }`}
+            >
+              {/* Channel icon */}
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                msg.channel === 'WHATSAPP' ? 'bg-green-50' : 'bg-blue-50'
+              }`}>
+                {msg.channel === 'WHATSAPP'
+                  ? <MessageSquare size={14} className="text-green-600" />
+                  : <Mail size={14} className="text-blue-600" />
+                }
               </div>
-              <p className="text-sm text-gray-600 truncate">{msg.content}</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {new Date(msg.createdAt).toLocaleString('en-IN')}
-              </p>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-sm font-semibold text-gray-900 truncate">
+                    {msg.party?.name || msg.fromAddress}
+                  </span>
+                  {!msg.isRead && (
+                    <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 ml-auto" />
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 truncate leading-snug">{msg.content}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-gray-400">
+                    {new Date(msg.createdAt).toLocaleString('en-IN')}
+                  </p>
+                  {msg.aiIntent && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${intentColors[msg.aiIntent] || intentColors.general}`}>
+                      {msg.aiIntent.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

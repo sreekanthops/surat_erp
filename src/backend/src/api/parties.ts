@@ -66,6 +66,26 @@ partiesRouter.get('/:id/ledger', async (req, res, next) => {
   }
 });
 
+// PUT /api/v1/parties/:id
+partiesRouter.put('/:id', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const data = createPartySchema.partial().parse(req.body);
+    const result = await prisma.party.updateMany({ where: { id: req.params.id, tenantId }, data });
+    if (!result.count) return res.status(404).json({ error: 'Party not found' });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/parties/:id
+partiesRouter.delete('/:id', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    await prisma.party.deleteMany({ where: { id: req.params.id, tenantId } });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // POST /api/v1/parties
 const createPartySchema = z.object({
   name: z.string().min(1),

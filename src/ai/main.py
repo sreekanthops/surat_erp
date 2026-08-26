@@ -17,8 +17,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Surat Textile AI Service",
-    description="LLM-powered business intelligence for textile industry",
+    title="GSpaces AI CRM",
+    description="LLM-powered business intelligence for GSpaces AI CRM",
     version="1.0.0",
     lifespan=lifespan,
 )

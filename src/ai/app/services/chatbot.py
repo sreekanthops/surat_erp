@@ -1,9 +1,17 @@
 import os
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 from openai import AsyncOpenAI
 from app.core.config import settings
 
-client = AsyncOpenAI(api_key=settings.openai_api_key)
+# OpenRouter uses the OpenAI SDK with a custom base_url
+client = AsyncOpenAI(
+    api_key=settings.openrouter_api_key,
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "https://surat-textile-dashboard.app",
+        "X-Title": "GSpaces AI CRM",
+    },
+)
 
 SYSTEM_PROMPT = """You are an expert AI business assistant for a textile business in Surat, India.
 
@@ -55,7 +63,7 @@ class TextileChatbot:
         messages.append({"role": "user", "content": message})
 
         response = await client.chat.completions.create(
-            model=settings.openai_model,
+            model=settings.openrouter_model,
             messages=messages,
             temperature=0.3,
             max_tokens=800,
@@ -67,7 +75,7 @@ class TextileChatbot:
         return {
             "response": reply,
             "tokens_used": tokens,
-            "sql_query": None,  # TODO: implement text-to-SQL for structured queries
+            "sql_query": None,
         }
 
     async def daily_suggestions(self, tenant_id: str) -> dict:
@@ -80,7 +88,7 @@ class TextileChatbot:
         """
 
         response = await client.chat.completions.create(
-            model=settings.openai_model,
+            model=settings.openrouter_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
             max_tokens=300,

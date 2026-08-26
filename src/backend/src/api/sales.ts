@@ -169,6 +169,51 @@ salesRouter.post('/invoices', async (req, res, next) => {
   }
 });
 
+// DELETE /api/v1/sales/invoices/:id
+salesRouter.delete('/invoices/:id', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const inv = await prisma.transaction.findFirst({ where: { id: req.params.id, tenantId }, include: { items: true } });
+    if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+    await prisma.$transaction(async (tx) => {
+      // Restore stock
+      for (const item of inv.items) {
+        if (item.productId) {
+          await tx.product.update({ where: { id: item.productId }, data: { currentStock: { increment: Number(item.quantity) } } });
+        }
+      }
+      // Reverse party balance
+      if (inv.partyId) {
+        await tx.party.update({ where: { id: inv.partyId }, data: { currentBalance: { decrement: Number(inv.totalAmount) } } });
+      }
+      await tx.transactionItem.deleteMany({ where: { transactionId: req.params.id } });
+      await tx.transaction.delete({ where: { id: req.params.id } });
+    });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/v1/sales/invoices/:id/payment
+salesRouter.patch('/invoices/:id/payment', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const { amount, paymentMode } = req.body;
+    const inv = await prisma.transaction.findFirst({ where: { id: req.params.id, tenantId } });
+    if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+    const newPaid = Math.min(Number(inv.paidAmount) + Number(amount), Number(inv.totalAmount));
+    const status = newPaid >= Number(inv.totalAmount) ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'PENDING';
+    await prisma.transaction.update({
+      where: { id: req.params.id },
+      data: { paidAmount: newPaid, status: status as any, paymentMode },
+    });
+    // Reduce party balance by payment amount
+    if (inv.partyId) {
+      await prisma.party.update({ where: { id: inv.partyId }, data: { currentBalance: { decrement: Number(amount) } } });
+    }
+    return res.json({ ok: true, paidAmount: newPaid, status });
+  } catch (err) { next(err); }
+});
+
 // GET /api/v1/sales/analytics
 salesRouter.get('/analytics', async (req, res, next) => {
   try {

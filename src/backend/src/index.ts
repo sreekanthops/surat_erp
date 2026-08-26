@@ -54,7 +54,10 @@ io.use((socket, next) => {
 
 // ── Global Middleware ──────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: process.env.APP_URL, credentials: true }));
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [process.env.APP_URL as string]
+  : [process.env.APP_URL || 'http://localhost:3000', 'http://localhost:3000', 'http://127.0.0.1:3000'];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));

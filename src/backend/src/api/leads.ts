@@ -67,6 +67,29 @@ leadsRouter.post('/', async (req, res, next) => {
   }
 });
 
+// PUT /api/v1/leads/:id
+leadsRouter.put('/:id', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const data = createLeadSchema.partial().parse(req.body);
+    const result = await prisma.lead.updateMany({
+      where: { id: req.params.id, tenantId },
+      data: { ...data, followUpDate: data.followUpDate ? new Date(data.followUpDate) : undefined },
+    });
+    if (!result.count) return res.status(404).json({ error: 'Lead not found' });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/leads/:id
+leadsRouter.delete('/:id', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    await prisma.lead.deleteMany({ where: { id: req.params.id, tenantId } });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // PATCH /api/v1/leads/:id/status
 leadsRouter.patch('/:id/status', async (req, res, next) => {
   try {

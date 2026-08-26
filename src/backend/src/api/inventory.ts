@@ -96,6 +96,32 @@ inventoryRouter.get('/movements', async (req, res, next) => {
   }
 });
 
+// PUT /api/v1/inventory/products/:id
+inventoryRouter.put('/products/:id', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const data = createProductSchema.partial().parse(req.body);
+    const product = await prisma.product.updateMany({
+      where: { id: req.params.id, tenantId },
+      data,
+    });
+    if (!product.count) return res.status(404).json({ error: 'Product not found' });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/inventory/products/:id
+inventoryRouter.delete('/products/:id', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    await prisma.product.updateMany({
+      where: { id: req.params.id, tenantId },
+      data: { isActive: false },
+    });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // GET /api/v1/inventory/low-stock
 inventoryRouter.get('/low-stock', async (req, res, next) => {
   try {
