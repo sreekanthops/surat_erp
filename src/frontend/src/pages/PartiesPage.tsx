@@ -567,8 +567,8 @@ export default function PartiesPage() {
     return {
       customers: allParties.filter((p) => p.type === 'CUSTOMER' || p.type === 'BOTH').length,
       suppliers: allParties.filter((p) => p.type === 'SUPPLIER' || p.type === 'BOTH').length,
-      receivable: allParties.filter((p) => p.currentBalance > 0).reduce((s, p) => s + p.currentBalance, 0),
-      payable: allParties.filter((p) => p.currentBalance < 0).reduce((s, p) => s + Math.abs(p.currentBalance), 0),
+      receivable: allParties.filter((p) => Number(p.currentBalance) > 0).reduce((s, p) => s + Number(p.currentBalance), 0),
+      payable: allParties.filter((p) => Number(p.currentBalance) < 0).reduce((s, p) => s + Math.abs(Number(p.currentBalance)), 0),
     };
   }, [data]);
 
@@ -822,9 +822,10 @@ export default function PartiesPage() {
                 </tr>
               ) : (
                 parties.map((party, i) => {
+                  const bal = Number(party.currentBalance);
                   const balColor =
-                    party.currentBalance > 0 ? '#ef4444' :
-                    party.currentBalance < 0 ? '#16a34a' :
+                    bal > 0 ? '#ef4444' :
+                    bal < 0 ? '#16a34a' :
                     '#94a3b8';
 
                   return (
@@ -862,17 +863,17 @@ export default function PartiesPage() {
 
                       {/* Credit Limit */}
                       <td style={{ padding: '14px 16px', color: '#475569', fontVariantNumeric: 'tabular-nums' }}>
-                        {party.creditLimit > 0 ? fmt(party.creditLimit) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                        {Number(party.creditLimit) > 0 ? fmt(Number(party.creditLimit)) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
 
                       {/* Balance */}
                       <td style={{ padding: '14px 16px' }}>
                         <span style={{ fontWeight: 700, color: balColor, fontVariantNumeric: 'tabular-nums' }}>
-                          {fmt(Math.abs(party.currentBalance))}
+                          {fmt(Math.abs(bal))}
                         </span>
-                        {party.currentBalance !== 0 && (
+                        {bal !== 0 && (
                           <div style={{ fontSize: '11px', color: balColor, opacity: 0.75, marginTop: '2px' }}>
-                            {party.currentBalance > 0 ? 'Receivable' : 'Payable'}
+                            {bal > 0 ? 'Receivable' : 'Payable'}
                           </div>
                         )}
                       </td>

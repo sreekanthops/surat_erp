@@ -12,10 +12,21 @@ dashboardRouter.get('/charts', async (req, res, next) => {
     const gf = groupFilter(req);
 
     const now = new Date();
-    const day30ago = new Date(now); day30ago.setDate(now.getDate() - 29); day30ago.setHours(0,0,0,0);
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const { from: fromQ, to: toQ } = req.query as Record<string, string>;
+
+    // If custom range provided use it, else default to last 30 days / current month
+    const rangeFrom = fromQ ? new Date(fromQ) : (() => { const d = new Date(now); d.setDate(now.getDate() - 29); d.setHours(0,0,0,0); return d; })();
+    const rangeTo   = toQ   ? (() => { const d = new Date(toQ); d.setHours(23,59,59,999); return d; })() : now;
+
+    const day30ago    = rangeFrom;
+    const monthStart  = fromQ ? rangeFrom : new Date(now.getFullYear(), now.getMonth(), 1);
     const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const prevMonthEnd   = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // For monthly trend: span from 6 months before rangeFrom if custom, else last 6 months
+    const trendStart = fromQ
+      ? (() => { const d = new Date(rangeFrom); d.setMonth(d.getMonth() - 5); d.setDate(1); d.setHours(0,0,0,0); return d; })()
+      : new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
     const [dailyRaw, topProductsRaw, statusBreakdown, categoryRaw, monthlyTrendRaw, prevMonth] = await Promise.all([
 
@@ -25,12 +36,12 @@ dashboardRouter.get('/charts', async (req, res, next) => {
         FROM transactions
         WHERE "tenantId" = '${tenantId}'::uuid
           AND type = 'SALE'::"TransactionType"
-          AND date >= $1
+          AND date >= $1 AND date <= $2
           ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND "groupId" IS NULL' : `AND "groupId" = '${gf.groupId}'::uuid`}
         GROUP BY DATE(date) ORDER BY day
-      `, day30ago) as Promise<any[]>,
+      `, day30ago, rangeTo) as Promise<any[]>,
 
-      // Top 6 products by revenue this month
+      // Top 6 products by revenue in selected range
       prisma.$queryRawUnsafe(`
         SELECT ti."productName" as name,
                SUM(ti."totalAmount")::float as revenue,
@@ -39,21 +50,21 @@ dashboardRouter.get('/charts', async (req, res, next) => {
         JOIN transactions t ON t.id = ti."transactionId"
         WHERE t."tenantId" = '${tenantId}'::uuid
           AND t.type = 'SALE'::"TransactionType"
-          AND t.date >= $1
+          AND t.date >= $1 AND t.date <= $2
           ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND t."groupId" IS NULL' : `AND t."groupId" = '${gf.groupId}'::uuid`}
         GROUP BY ti."productName"
         ORDER BY revenue DESC LIMIT 6
-      `, monthStart) as Promise<any[]>,
+      `, rangeFrom, rangeTo) as Promise<any[]>,
 
-      // Payment status breakdown last 90 days
+      // Payment status breakdown — within selected range
       prisma.transaction.groupBy({
         by: ['status'],
-        where: { tenantId, ...gf, type: TransactionType.SALE, date: { gte: new Date(now.getTime() - 90*86400000) } },
+        where: { tenantId, ...gf, type: TransactionType.SALE, date: { gte: rangeFrom, lte: rangeTo } },
         _count: true,
         _sum: { totalAmount: true },
       }),
 
-      // Sales by product category this month
+      // Sales by product category in selected range
       prisma.$queryRawUnsafe(`
         SELECT COALESCE(p.category, 'Other') as category,
                SUM(ti."totalAmount")::float as revenue
@@ -62,13 +73,13 @@ dashboardRouter.get('/charts', async (req, res, next) => {
         LEFT JOIN products p ON p.id = ti."productId"
         WHERE t."tenantId" = '${tenantId}'::uuid
           AND t.type = 'SALE'::"TransactionType"
-          AND t.date >= $1
+          AND t.date >= $1 AND t.date <= $2
           ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND t."groupId" IS NULL' : `AND t."groupId" = '${gf.groupId}'::uuid`}
         GROUP BY COALESCE(p.category, 'Other')
         ORDER BY revenue DESC
-      `, monthStart) as Promise<any[]>,
+      `, rangeFrom, rangeTo) as Promise<any[]>,
 
-      // Monthly revenue last 6 months
+      // Monthly revenue (span of selected range or last 6 months)
       prisma.$queryRawUnsafe(`
         SELECT TO_CHAR(DATE_TRUNC('month', date), 'Mon YY') as month,
                DATE_TRUNC('month', date) as month_date,
@@ -80,23 +91,24 @@ dashboardRouter.get('/charts', async (req, res, next) => {
           ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND "groupId" IS NULL' : `AND "groupId" = '${gf.groupId}'::uuid`}
         GROUP BY DATE_TRUNC('month', date), TO_CHAR(DATE_TRUNC('month', date), 'Mon YY')
         ORDER BY month_date
-      `, new Date(now.getFullYear(), now.getMonth() - 5, 1)) as Promise<any[]>,
+      `, trendStart) as Promise<any[]>,      // intentionally no upper bound — show full months including future if range spans them
 
-      // Prev month sales for comparison
+      // Prev period sales for MoM comparison
       prisma.transaction.aggregate({
         where: { tenantId, ...gf, type: TransactionType.SALE, date: { gte: prevMonthStart, lte: prevMonthEnd } },
         _sum: { totalAmount: true },
       }),
     ]);
 
-    // Fill in missing days with 0 for the last 30 days
+    // Fill in missing days with 0 across the selected range
+    const totalDays = Math.min(Math.ceil((rangeTo.getTime() - rangeFrom.getTime()) / 86400000) + 1, 90);
     const dailyMap = new Map<string, { amount: number; count: number }>();
     for (const r of dailyRaw) {
       dailyMap.set(new Date(r.day).toISOString().split('T')[0], { amount: r.amount, count: r.count });
     }
     const daily30: { day: string; amount: number; count: number }[] = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now); d.setDate(now.getDate() - i); d.setHours(0,0,0,0);
+    for (let i = totalDays - 1; i >= 0; i--) {
+      const d = new Date(rangeTo); d.setDate(rangeTo.getDate() - i); d.setHours(0,0,0,0);
       const key = d.toISOString().split('T')[0];
       const label = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
       const entry = dailyMap.get(key);
@@ -110,7 +122,7 @@ dashboardRouter.get('/charts', async (req, res, next) => {
     }));
 
     const currentMonthSales = Number((await prisma.transaction.aggregate({
-      where: { tenantId, ...gf, type: TransactionType.SALE, date: { gte: monthStart } },
+      where: { tenantId, ...gf, type: TransactionType.SALE, date: { gte: rangeFrom, lte: rangeTo } },
       _sum: { totalAmount: true },
     }))._sum.totalAmount ?? 0);
 

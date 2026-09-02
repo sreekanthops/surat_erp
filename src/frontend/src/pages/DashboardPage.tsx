@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
 import {
@@ -90,33 +91,54 @@ const exportDashboardExcel = (charts: any) => {
   saveAs(new Blob([buf], { type: 'application/octet-stream' }), `Dashboard_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
 
+// Helper: YYYY-MM-DD
+const isoDate = (d: Date) => d.toISOString().split('T')[0];
+const todayStr = () => isoDate(new Date());
+const daysAgoStr = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return isoDate(d); };
+
 export default function DashboardPage() {
+  const [from, setFrom] = useState(() => daysAgoStr(29));
+  const [to,   setTo]   = useState(todayStr);
+
   const { data: summary, isLoading: loadSum } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: () => api.get('/api/v1/dashboard/summary').then(r => r.data),
     refetchInterval: 60_000,
   });
   const { data: charts, isLoading: loadCharts } = useQuery({
-    queryKey: ['dashboard-charts'],
-    queryFn: () => api.get('/api/v1/dashboard/charts').then(r => r.data),
+    queryKey: ['dashboard-charts', from, to],
+    queryFn: () => api.get('/api/v1/dashboard/charts', { params: { from, to } }).then(r => r.data),
     refetchInterval: 120_000,
   });
 
-  const { today, month, alerts } = summary || {};
+  const { today: todayData, month, alerts } = summary || {};
   const mom = charts?.momGrowth ?? 0;
   const momUp = mom >= 0;
 
+  // Quick-range presets
+  const setRange = (days: number) => { setFrom(daysAgoStr(days - 1)); setTo(todayStr()); };
+  const presets = [
+    { label: '7D',  days: 7  },
+    { label: '30D', days: 30 },
+    { label: '90D', days: 90 },
+    { label: 'MTD', days: 0  }, // special: month-to-date
+  ];
+  const setMTD = () => {
+    const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    setFrom(isoDate(start)); setTo(todayStr());
+  };
+
   const kpis = [
     {
-      title: "Today's Sales", value: fmt(today?.salesAmount ?? 0),
-      sub: `${today?.salesCount ?? 0} invoices`,
+      title: "Today's Sales", value: fmt(todayData?.salesAmount ?? 0),
+      sub: `${todayData?.salesCount ?? 0} invoices`,
       gradient: 'linear-gradient(135deg,#667eea,#764ba2)', shadow: 'rgba(102,126,234,0.35)',
     },
     {
-      title: 'Month Sales', value: fmt(month?.salesAmount ?? 0),
+      title: 'Period Sales', value: fmt(charts?.currentMonthSales ?? 0),
       sub: <span style={{ display:'flex', alignItems:'center', gap:3 }}>
         {momUp ? <ArrowUpRight size={11}/> : <ArrowDownRight size={11}/>}
-        {Math.abs(mom)}% vs last month
+        {Math.abs(mom)}% vs prev period
       </span>,
       gradient: 'linear-gradient(135deg,#11998e,#38ef7d)', shadow: 'rgba(17,153,142,0.35)',
     },
@@ -126,31 +148,54 @@ export default function DashboardPage() {
       gradient: 'linear-gradient(135deg,#f7971e,#ffd200)', shadow: 'rgba(247,151,30,0.35)',
     },
     {
-      title: 'Unread Messages', value: String(today?.newMessages ?? 0),
+      title: 'Unread Messages', value: String(todayData?.newMessages ?? 0),
       sub: 'WhatsApp + Gmail',
       gradient: 'linear-gradient(135deg,#f093fb,#f5576c)', shadow: 'rgba(240,147,251,0.35)',
     },
   ];
+
+  const inputS: React.CSSProperties = { padding: '7px 11px', border: '1.5px solid #e2e8f0', borderRadius: 9, fontSize: 12, outline: 'none', background: '#fff', cursor: 'pointer' };
+  const presetBtnS = (active: boolean): React.CSSProperties => ({
+    padding: '6px 11px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+    background: active ? '#6366f1' : '#f1f5f9', color: active ? '#fff' : '#64748b', transition: 'all 0.12s',
+  });
 
   return (
     <div style={{ padding: '28px 32px', fontFamily: 'Inter,sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
       <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>Dashboard</h1>
           <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <button
-          onClick={() => exportDashboardExcel(charts)}
-          disabled={loadCharts || !charts}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 11, border: '1.5px solid #16a34a22', background: '#16a34a0d', color: '#16a34a', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-        >
-          <Download size={14} /> Export Excel
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Preset buttons */}
+          {presets.map(p => (
+            <button key={p.label} style={presetBtnS(
+              p.days === 0
+                ? from === isoDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)) && to === todayStr()
+                : from === daysAgoStr(p.days - 1) && to === todayStr()
+            )} onClick={() => p.days === 0 ? setMTD() : setRange(p.days)}>
+              {p.label}
+            </button>
+          ))}
+          {/* Custom range */}
+          <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} style={inputS} />
+          <span style={{ fontSize: 12, color: '#94a3b8' }}>to</span>
+          <input type="date" value={to} min={from} max={todayStr()} onChange={e => setTo(e.target.value)} style={inputS} />
+          {/* Export */}
+          <button
+            onClick={() => exportDashboardExcel(charts)}
+            disabled={loadCharts || !charts}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, border: '1.5px solid #16a34a22', background: '#16a34a0d', color: '#16a34a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          >
+            <Download size={13} /> Excel
+          </button>
+        </div>
       </div>
 
       {/* KPI Row */}
@@ -176,7 +221,7 @@ export default function DashboardPage() {
 
         {/* Daily Sales — Area Chart */}
         <div style={card()}>
-          {sectionTitle('Daily Sales — Last 30 Days', 'Revenue trend')}
+          {sectionTitle(`Daily Sales — ${from} to ${to}`, 'Revenue trend')}
           {loadCharts ? <Skeleton h={220} /> : (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={charts?.daily30 ?? []} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -187,7 +232,7 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={4} tickLine={false} axisLine={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={Math.max(Math.floor((charts?.daily30?.length ?? 30) / 8) - 1, 0)} tickLine={false} axisLine={false} />
                 <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={52} />
                 <Tooltip content={<CustomTooltip />} />
                 <Area type="monotone" dataKey="amount" name="Sales" stroke="#6366f1" strokeWidth={2.5} fill="url(#salesGrad)" dot={false} activeDot={{ r: 5 }} />
@@ -198,7 +243,7 @@ export default function DashboardPage() {
 
         {/* Payment Status Pie */}
         <div style={card()}>
-          {sectionTitle('Invoice Status', 'Last 90 days')}
+          {sectionTitle('Invoice Status', `${from} to ${to}`)}
           {loadCharts ? <Skeleton h={220} /> : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
