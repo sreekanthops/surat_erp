@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../services/db.js';
 import { io } from '../index.js';
 import axios from 'axios';
+import { groupFilter, groupWrite } from '../middleware/groupFilter.js';
 
 export const messagesRouter = Router();
 
@@ -143,32 +144,27 @@ async function storeWhatsAppMessage(opts: {
 messagesRouter.get('/inbox', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const { channel, intent, isRead, page = '1', limit = '30' } = req.query as Record<string, string>;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    const where = {
+      tenantId, ...gf,
+      direction: 'INBOUND' as const,
+      ...(channel && { channel: channel as any }),
+      ...(intent && { aiIntent: intent }),
+      ...(isRead !== undefined && { isRead: isRead === 'true' }),
+    };
+
     const [data, total] = await Promise.all([
       prisma.message.findMany({
-        where: {
-          tenantId,
-          direction: 'INBOUND',
-          ...(channel && { channel: channel as any }),
-          ...(intent && { aiIntent: intent }),
-          ...(isRead !== undefined && { isRead: isRead === 'true' }),
-        },
+        where,
         include: { party: { select: { id: true, name: true, phone: true } } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: parseInt(limit),
       }),
-      prisma.message.count({
-        where: {
-          tenantId,
-          direction: 'INBOUND',
-          ...(channel && { channel: channel as any }),
-          ...(intent && { aiIntent: intent }),
-          ...(isRead !== undefined && { isRead: isRead === 'true' }),
-        },
-      }),
+      prisma.message.count({ where }),
     ]);
 
     return res.json({ data, total, page: parseInt(page) });
@@ -181,8 +177,9 @@ messagesRouter.get('/inbox', async (req, res, next) => {
 messagesRouter.patch('/:id/read', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     await prisma.message.updateMany({
-      where: { id: req.params.id, tenantId },
+      where: { id: req.params.id, tenantId, ...gf },
       data: { isRead: true },
     });
     return res.json({ ok: true });
@@ -195,9 +192,10 @@ messagesRouter.patch('/:id/read', async (req, res, next) => {
 messagesRouter.post('/reply', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const { messageId, content, createLead } = req.body;
 
-    const original = await prisma.message.findFirst({ where: { id: messageId, tenantId } });
+    const original = await prisma.message.findFirst({ where: { id: messageId, tenantId, ...gf } });
     if (!original) return res.status(404).json({ error: 'Message not found' });
 
     // ── Actually send via WhatsApp if channel is WHATSAPP ────────────────────
@@ -280,12 +278,13 @@ messagesRouter.post('/reply', async (req, res, next) => {
 messagesRouter.get('/potential-leads', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const days = parseInt(req.query.days as string) || 30;
     const since = new Date(); since.setDate(since.getDate() - days);
 
     const messages = await prisma.message.findMany({
       where: {
-        tenantId,
+        tenantId, ...gf,
         channel: 'WHATSAPP',
         direction: 'INBOUND',
         createdAt: { gte: since },
@@ -379,12 +378,13 @@ messagesRouter.get('/potential-leads', async (req, res, next) => {
 messagesRouter.get('/whatsapp-leads', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const minScore = parseInt(req.query.minScore as string) || 40;
     const since = new Date(); since.setDate(since.getDate() - 30);
 
     const messages = await prisma.message.findMany({
       where: {
-        tenantId,
+        tenantId, ...gf,
         channel: 'WHATSAPP',
         direction: 'INBOUND',
         aiIntent: { in: ['quote_request', 'new_customer_inquiry', 'bulk_inquiry', 'order_confirm', 'catalogue_request', 'sample_request'] },
@@ -398,7 +398,7 @@ messagesRouter.get('/whatsapp-leads', async (req, res, next) => {
     // Check which ones already have leads
     const partyIds = [...new Set(messages.map(m => m.partyId).filter(Boolean))];
     const existingLeads = await prisma.lead.findMany({
-      where: { tenantId, partyId: { in: partyIds as string[] } },
+      where: { tenantId, ...gf, partyId: { in: partyIds as string[] } },
       select: { partyId: true, status: true },
     });
     const leadPartyIds = new Set(existingLeads.map(l => l.partyId));
@@ -504,8 +504,10 @@ messagesRouter.post('/whatsapp-webhook', async (req, res) => {
 messagesRouter.patch('/:id/convert-lead', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
+    const groupId = groupWrite(req);
     const msg = await prisma.message.findFirst({
-      where: { id: req.params.id, tenantId },
+      where: { id: req.params.id, tenantId, ...gf },
       include: { party: true },
     });
     if (!msg) return res.status(404).json({ error: 'Message not found' });
@@ -515,6 +517,7 @@ messagesRouter.patch('/:id/convert-lead', async (req, res, next) => {
     const lead = await prisma.lead.create({
       data: {
         tenantId,
+        groupId,
         partyId: msg.partyId || undefined,
         sourceMessageId: msg.id,
         source: msg.channel as any,
@@ -539,12 +542,14 @@ messagesRouter.patch('/:id/convert-lead', async (req, res, next) => {
 messagesRouter.post('/bulk-convert-leads', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
+    const groupId = groupWrite(req);
     const { minScore = 70 } = req.body;
     const since = new Date(); since.setDate(since.getDate() - 30);
 
     const messages = await prisma.message.findMany({
       where: {
-        tenantId,
+        tenantId, ...gf,
         channel: 'WHATSAPP',
         direction: 'INBOUND',
         aiIntent: { in: ['quote_request', 'new_customer_inquiry', 'bulk_inquiry', 'order_confirm'] },
@@ -564,7 +569,7 @@ messagesRouter.post('/bulk-convert-leads', async (req, res, next) => {
 
       // Skip if lead already exists
       const existing = await prisma.lead.findFirst({
-        where: { tenantId, partyId: msg.partyId, source: 'WHATSAPP', createdAt: { gte: since } },
+        where: { tenantId, ...gf, partyId: msg.partyId, source: 'WHATSAPP', createdAt: { gte: since } },
       });
       if (existing) continue;
 
@@ -572,6 +577,7 @@ messagesRouter.post('/bulk-convert-leads', async (req, res, next) => {
         await prisma.lead.create({
           data: {
             tenantId,
+            groupId,
             partyId: msg.partyId,
             sourceMessageId: msg.id,
             source: 'WHATSAPP',

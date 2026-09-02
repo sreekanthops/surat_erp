@@ -1,12 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+interface Group {
+  id: string;
+  name: string;
+}
+
 interface User {
   id: string;
   name: string;
   phone: string;
   role: string;
   tenant: { id: string; name: string; plan: string };
+  group?: Group | null;
 }
 
 interface AuthState {

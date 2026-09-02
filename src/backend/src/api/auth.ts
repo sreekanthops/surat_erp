@@ -18,7 +18,10 @@ authRouter.post('/login', async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { phone },
-      include: { tenant: { select: { id: true, name: true, plan: true, isActive: true } } },
+      include: {
+        tenant: { select: { id: true, name: true, plan: true, isActive: true } },
+        group: { select: { id: true, name: true } },
+      },
     });
 
     if (!user || !user.passwordHash) {
@@ -30,7 +33,7 @@ authRouter.post('/login', async (req, res, next) => {
 
     if (!user.isActive) return res.status(403).json({ error: 'Account inactive', code: 'AUTH_003' });
 
-    const token = signToken({ userId: user.id, tenantId: user.tenantId, role: user.role });
+    const token = signToken({ userId: user.id, tenantId: user.tenantId, role: user.role, groupId: user.groupId ?? undefined });
     const refreshToken = signRefreshToken({ userId: user.id });
 
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
@@ -44,6 +47,7 @@ authRouter.post('/login', async (req, res, next) => {
         phone: user.phone,
         role: user.role,
         tenant: user.tenant,
+        group: user.group,
       },
     });
   } catch (err) {

@@ -4,6 +4,7 @@ export interface JwtPayload {
   userId: string;
   tenantId: string;
   role: string;
+  groupId?: string;
 }
 
 export const verifyToken = (token: string): JwtPayload => {

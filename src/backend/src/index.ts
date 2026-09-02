@@ -9,6 +9,7 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 
 import { authRouter } from './api/auth.js';
+import { adminRouter } from './api/admin.js';
 import { dashboardRouter } from './api/dashboard.js';
 import { inventoryRouter } from './api/inventory.js';
 import { salesRouter } from './api/sales.js';
@@ -84,6 +85,7 @@ app.use('/api/v1/leads', leadsRouter);
 app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/integrations', integrationsRouter);
+app.use('/api/v1/admin', adminRouter);
 
 // ── Health Check ──────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));

@@ -2,7 +2,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Package, Receipt, MessageSquare,
   Users, FileBarChart, Bot, Settings, TrendingUp, LogOut,
-  ChevronRight,
+  ChevronRight, ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
@@ -18,8 +18,13 @@ const nav = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
+const adminNav = [
+  { to: '/admin', icon: ShieldCheck, label: 'Admin' },
+];
+
 export default function Layout() {
   const { user, logout } = useAuthStore();
+  const isAdmin = user?.role === 'OWNER' || user?.role === 'SUPER_ADMIN';
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f1f5f9', fontFamily: 'Inter, sans-serif' }}>
@@ -97,6 +102,41 @@ export default function Layout() {
               )}
             </NavLink>
           ))}
+
+          {/* Admin section — only OWNER / SUPER_ADMIN */}
+          {isAdmin && (
+            <>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(148,163,184,0.6)', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '0 8px', margin: '14px 0 8px' }}>
+                Admin
+              </div>
+              {adminNav.map(({ to, icon: Icon, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  style={{ textDecoration: 'none', display: 'block', marginBottom: '2px' }}
+                >
+                  {({ isActive }) => (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '10px 12px', borderRadius: '10px',
+                      cursor: 'pointer', transition: 'all 0.18s ease',
+                      background: isActive
+                        ? 'linear-gradient(90deg, rgba(99,102,241,0.9), rgba(139,92,246,0.8))'
+                        : 'transparent',
+                      boxShadow: isActive ? '0 2px 12px rgba(99,102,241,0.35)' : 'none',
+                      color: isActive ? '#fff' : 'rgba(148,163,184,0.85)',
+                      fontWeight: isActive ? 600 : 400,
+                      fontSize: '13.5px',
+                    }}>
+                      <Icon size={16} style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7 }} />
+                      <span style={{ flex: 1 }}>{label}</span>
+                      {isActive && <ChevronRight size={14} style={{ opacity: 0.7 }} />}
+                    </div>
+                  )}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         {/* User footer */}
@@ -119,7 +159,7 @@ export default function Layout() {
                 {user?.name}
               </div>
               <div style={{ fontSize: '10px', color: 'rgba(148,163,184,0.7)', textTransform: 'capitalize' }}>
-                {user?.role?.toLowerCase()}
+                {user?.role?.toLowerCase()}{user?.group ? ` · ${user.group.name}` : ''}
               </div>
             </div>
           </div>

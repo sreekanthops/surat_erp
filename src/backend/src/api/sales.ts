@@ -3,6 +3,7 @@ import { prisma } from '../services/db.js';
 import { z } from 'zod';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 import { io } from '../index.js';
+import { groupFilter, groupWrite } from '../middleware/groupFilter.js';
 
 export const salesRouter = Router();
 
@@ -31,32 +32,27 @@ const createInvoiceSchema = z.object({
 salesRouter.get('/invoices', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const { from, to, partyId, status, page = '1', limit = '20' } = req.query as Record<string, string>;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    const where = {
+      tenantId, ...gf,
+      type: TransactionType.SALE,
+      ...(partyId && { partyId }),
+      ...(status && { status: status as TransactionStatus }),
+      ...(from && to && { date: { gte: new Date(from), lte: new Date(to) } }),
+    };
+
     const [data, total] = await Promise.all([
       prisma.transaction.findMany({
-        where: {
-          tenantId,
-          type: TransactionType.SALE,
-          ...(partyId && { partyId }),
-          ...(status && { status: status as TransactionStatus }),
-          ...(from && to && { date: { gte: new Date(from), lte: new Date(to) } }),
-        },
+        where,
         include: { party: { select: { id: true, name: true, phone: true } } },
         orderBy: { date: 'desc' },
         skip,
         take: parseInt(limit),
       }),
-      prisma.transaction.count({
-        where: {
-          tenantId,
-          type: TransactionType.SALE,
-          ...(partyId && { partyId }),
-          ...(status && { status: status as TransactionStatus }),
-          ...(from && to && { date: { gte: new Date(from), lte: new Date(to) } }),
-        },
-      }),
+      prisma.transaction.count({ where }),
     ]);
 
     return res.json({ data, total, page: parseInt(page) });
@@ -69,8 +65,9 @@ salesRouter.get('/invoices', async (req, res, next) => {
 salesRouter.get('/invoices/:id', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const invoice = await prisma.transaction.findFirst({
-      where: { id: req.params.id, tenantId },
+      where: { id: req.params.id, tenantId, ...gf },
       include: {
         party: true,
         items: { include: { product: { select: { name: true, unit: true } } } },
@@ -89,9 +86,9 @@ salesRouter.post('/invoices', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const userId = (req as any).user.userId;
+    const groupId = groupWrite(req);
     const body = createInvoiceSchema.parse(req.body);
 
-    // Calculate totals
     let subtotal = 0;
     const processedItems = body.items.map((item, idx) => {
       const amount = item.quantity * item.rate * (1 - (item.discountPct || 0) / 100);
@@ -103,15 +100,14 @@ salesRouter.post('/invoices', async (req, res, next) => {
     const totalGst = processedItems.reduce((s, i) => s + (i.gstAmount || 0), 0);
     const totalAmount = subtotal + totalGst;
 
-    // Auto-generate reference number
     const count = await prisma.transaction.count({ where: { tenantId, type: TransactionType.SALE } });
     const referenceNo = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
 
     const invoice = await prisma.$transaction(async (tx) => {
-      // Create transaction
       const trx = await tx.transaction.create({
         data: {
           tenantId,
+          groupId,
           type: TransactionType.SALE,
           partyId: body.partyId,
           referenceNo,
@@ -129,7 +125,6 @@ salesRouter.post('/invoices', async (req, res, next) => {
         include: { party: true, items: true },
       });
 
-      // Deduct stock for each item
       for (const item of processedItems) {
         if (item.productId) {
           await tx.product.update({
@@ -139,6 +134,7 @@ salesRouter.post('/invoices', async (req, res, next) => {
           await tx.stockMovement.create({
             data: {
               tenantId,
+              groupId,
               productId: item.productId,
               transactionId: trx.id,
               godownId: item.godownId,
@@ -151,7 +147,6 @@ salesRouter.post('/invoices', async (req, res, next) => {
         }
       }
 
-      // Update party balance
       await tx.party.update({
         where: { id: body.partyId },
         data: { currentBalance: { increment: totalAmount } },
@@ -160,9 +155,7 @@ salesRouter.post('/invoices', async (req, res, next) => {
       return trx;
     });
 
-    // Push real-time event
     io.to(`tenant:${tenantId}`).emit('stock_updated', { type: 'sale', invoiceId: invoice.id });
-
     return res.status(201).json(invoice);
   } catch (err) {
     next(err);
@@ -173,16 +166,15 @@ salesRouter.post('/invoices', async (req, res, next) => {
 salesRouter.delete('/invoices/:id', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
-    const inv = await prisma.transaction.findFirst({ where: { id: req.params.id, tenantId }, include: { items: true } });
+    const gf = groupFilter(req);
+    const inv = await prisma.transaction.findFirst({ where: { id: req.params.id, tenantId, ...gf }, include: { items: true } });
     if (!inv) return res.status(404).json({ error: 'Invoice not found' });
     await prisma.$transaction(async (tx) => {
-      // Restore stock
       for (const item of inv.items) {
         if (item.productId) {
           await tx.product.update({ where: { id: item.productId }, data: { currentStock: { increment: Number(item.quantity) } } });
         }
       }
-      // Reverse party balance
       if (inv.partyId) {
         await tx.party.update({ where: { id: inv.partyId }, data: { currentBalance: { decrement: Number(inv.totalAmount) } } });
       }
@@ -197,8 +189,9 @@ salesRouter.delete('/invoices/:id', async (req, res, next) => {
 salesRouter.patch('/invoices/:id/payment', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const { amount, paymentMode } = req.body;
-    const inv = await prisma.transaction.findFirst({ where: { id: req.params.id, tenantId } });
+    const inv = await prisma.transaction.findFirst({ where: { id: req.params.id, tenantId, ...gf } });
     if (!inv) return res.status(404).json({ error: 'Invoice not found' });
     const newPaid = Math.min(Number(inv.paidAmount) + Number(amount), Number(inv.totalAmount));
     const status = newPaid >= Number(inv.totalAmount) ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'PENDING';
@@ -206,7 +199,6 @@ salesRouter.patch('/invoices/:id/payment', async (req, res, next) => {
       where: { id: req.params.id },
       data: { paidAmount: newPaid, status: status as any, paymentMode },
     });
-    // Reduce party balance by payment amount
     if (inv.partyId) {
       await prisma.party.update({ where: { id: inv.partyId }, data: { currentBalance: { decrement: Number(amount) } } });
     }
@@ -218,22 +210,30 @@ salesRouter.patch('/invoices/:id/payment', async (req, res, next) => {
 salesRouter.get('/analytics', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const { from, to } = req.query as Record<string, string>;
-
-    const fromDate = from ? new Date(from) : new Date(new Date().setDate(1)); // month start
+    const fromDate = from ? new Date(from) : new Date(new Date().setDate(1));
     const toDate = to ? new Date(to) : new Date();
 
-    const dailySales = await prisma.$queryRaw`
-      SELECT DATE(date) as day, 
-             SUM(total_amount) as amount, 
+    // Build a group condition for raw SQL
+    const groupCondition = gf.groupId === undefined
+      ? ''                                                          // owner: no filter
+      : gf.groupId === null
+        ? 'AND group_id IS NULL'                                   // ungrouped staff
+        : `AND group_id = '${gf.groupId}'::uuid`;                 // specific group
+
+    const dailySales = await prisma.$queryRawUnsafe(`
+      SELECT DATE(date) as day,
+             SUM(total_amount) as amount,
              COUNT(*) as count
       FROM transactions
-      WHERE tenant_id = ${tenantId}::uuid
+      WHERE tenant_id = '${tenantId}'::uuid
         AND type = 'SALE'
-        AND date BETWEEN ${fromDate} AND ${toDate}
+        AND date BETWEEN $1 AND $2
+        ${groupCondition}
       GROUP BY DATE(date)
       ORDER BY day
-    `;
+    `, fromDate, toDate);
 
     return res.json({ data: dailySales });
   } catch (err) {

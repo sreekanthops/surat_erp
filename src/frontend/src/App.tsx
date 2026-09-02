@@ -11,10 +11,17 @@ import PartiesPage from '@/pages/PartiesPage';
 import ReportsPage from '@/pages/ReportsPage';
 import ChatbotPage from '@/pages/ChatbotPage';
 import SettingsPage from '@/pages/SettingsPage';
+import AdminPage from '@/pages/AdminPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const token = useAuthStore((s) => s.token);
   return token ? <>{children}</> : <Navigate to="/login" replace />;
+};
+
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'OWNER' || user?.role === 'SUPER_ADMIN';
+  return isAdmin ? <>{children}</> : <Navigate to="/dashboard" replace />;
 };
 
 export default function App() {
@@ -39,6 +46,7 @@ export default function App() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="chatbot" element={<ChatbotPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
     </Routes>
   );

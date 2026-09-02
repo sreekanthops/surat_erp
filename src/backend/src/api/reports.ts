@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../services/db.js';
 import { TransactionType } from '@prisma/client';
+import { groupFilter } from '../middleware/groupFilter.js';
 
 export const reportsRouter = Router();
 
@@ -8,18 +9,19 @@ export const reportsRouter = Router();
 reportsRouter.get('/profit-loss', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const { from, to } = req.query as Record<string, string>;
     const fromDate = from ? new Date(from) : new Date(new Date().setDate(1));
     const toDate = to ? new Date(to) : new Date();
 
     const [sales, purchases] = await Promise.all([
       prisma.transaction.aggregate({
-        where: { tenantId, type: TransactionType.SALE, date: { gte: fromDate, lte: toDate } },
+        where: { tenantId, ...gf, type: TransactionType.SALE, date: { gte: fromDate, lte: toDate } },
         _sum: { totalAmount: true, taxableAmount: true },
         _count: true,
       }),
       prisma.transaction.aggregate({
-        where: { tenantId, type: TransactionType.PURCHASE, date: { gte: fromDate, lte: toDate } },
+        where: { tenantId, ...gf, type: TransactionType.PURCHASE, date: { gte: fromDate, lte: toDate } },
         _sum: { totalAmount: true },
         _count: true,
       }),
@@ -47,9 +49,10 @@ reportsRouter.get('/profit-loss', async (req, res, next) => {
 reportsRouter.get('/stock-summary', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
 
     const products = await prisma.product.findMany({
-      where: { tenantId, isActive: true },
+      where: { tenantId, ...gf, isActive: true },
       select: {
         id: true, name: true, category: true, unit: true,
         currentStock: true, reorderLevel: true, purchaseRate: true, saleRate: true,
@@ -65,9 +68,7 @@ reportsRouter.get('/stock-summary', async (req, res, next) => {
         : Number(p.currentStock) === 0 ? 'out' : 'ok',
     }));
 
-    const totalValue = data.reduce((s, p) => s + p.stockValue, 0);
-
-    return res.json({ data, totalValue });
+    return res.json({ data, totalValue: data.reduce((s, p) => s + p.stockValue, 0) });
   } catch (err) {
     next(err);
   }
@@ -77,10 +78,11 @@ reportsRouter.get('/stock-summary', async (req, res, next) => {
 reportsRouter.get('/party-outstanding', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
     const { type = 'CUSTOMER' } = req.query as Record<string, string>;
 
     const parties = await prisma.party.findMany({
-      where: { tenantId, type: type as any, currentBalance: { gt: 0 } },
+      where: { tenantId, ...gf, type: type as any, currentBalance: { gt: 0 } },
       orderBy: { currentBalance: 'desc' },
       select: { id: true, name: true, phone: true, city: true, currentBalance: true, creditLimit: true },
     });
