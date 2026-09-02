@@ -209,6 +209,17 @@ WHATSAPP LEAD DETECTION RULES:
 - This JSON format helps the UI display lead cards
 - If no WhatsApp leads exist, suggest using the Simulate WhatsApp feature in the Inbox page
 
+CHART / STATISTICS RULES:
+- When asked about trends, charts, graphs, statistics, sales over time, top products, stock distribution, payment breakdown — respond with text summary AND append chart data
+- Append chart data at the END of your response as: "CHART_DATA_JSON:" followed by JSON like:
+  {"type":"bar","title":"Daily Sales Last 7 Days","data":[{"name":"01 Jun","value":45000},{"name":"02 Jun","value":62000}]}
+  OR {"type":"pie","title":"Payment Status","data":[{"name":"PAID","value":150000},{"name":"PENDING","value":80000}]}
+  OR {"type":"line","title":"Monthly Trend","data":[{"name":"Apr","sales":200000,"purchases":120000}]}
+- For top products: use type "bar" with name=product name, value=revenue
+- For payment status: use type "pie"
+- For trends over time: use type "line" or "bar"
+- Only include CHART_DATA_JSON when you have actual numbers to show — skip if purely conversational
+
 - Today's date: ${today}`;
 }
 
@@ -245,17 +256,27 @@ aiRouter.post('/chat', async (req, res, next) => {
     const rawResponse = orRes.data.choices[0].message.content || '';
     const tokensUsed  = orRes.data.usage?.total_tokens ?? null;
 
-    // Extract lead JSON if present (for UI card rendering)
+    // Extract lead JSON
     let leadCards: any[] | null = null;
-    const jsonMatch = rawResponse.match(/LEAD_DATA_JSON:\s*(\[[\s\S]*?\])/);
-    if (jsonMatch) {
-      try { leadCards = JSON.parse(jsonMatch[1]); } catch { /* ignore */ }
+    const leadMatch = rawResponse.match(/LEAD_DATA_JSON:\s*(\[[\s\S]*?\])(?:\s*CHART_DATA_JSON:|$)/);
+    if (leadMatch) {
+      try { leadCards = JSON.parse(leadMatch[1]); } catch { /* ignore */ }
     }
 
-    // Strip the JSON tag from the displayed response
-    const response = rawResponse.replace(/LEAD_DATA_JSON:[\s\S]*$/, '').trim();
+    // Extract chart JSON
+    let chartData: any | null = null;
+    const chartMatch = rawResponse.match(/CHART_DATA_JSON:\s*(\{[\s\S]*?\})(?:\s*$)/);
+    if (chartMatch) {
+      try { chartData = JSON.parse(chartMatch[1]); } catch { /* ignore */ }
+    }
 
-    return res.json({ sessionId, response, tokensUsed, sqlQuery: null, leadCards });
+    // Strip JSON tags from displayed text
+    const response = rawResponse
+      .replace(/LEAD_DATA_JSON:[\s\S]*$/, '')
+      .replace(/CHART_DATA_JSON:[\s\S]*$/, '')
+      .trim();
+
+    return res.json({ sessionId, response, tokensUsed, sqlQuery: null, leadCards, chartData });
   } catch (err) {
     next(err);
   }

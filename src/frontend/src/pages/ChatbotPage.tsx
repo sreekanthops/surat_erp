@@ -2,11 +2,22 @@ import { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
 import { Send, Bot, User } from 'lucide-react';
+import {
+  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+
+interface ChartData {
+  type: 'bar' | 'pie' | 'line';
+  title: string;
+  data: any[];
+}
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   leadCards?: LeadCard[] | null;
+  chartData?: ChartData | null;
 }
 
 interface LeadCard {
@@ -27,6 +38,54 @@ const suggestions = [
   'Pending payments list karo',
   'Hot WhatsApp leads dikhao',
 ];
+
+// ── Inline chart colours ─────────────────────────────────────────────────────
+const CHAT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899'];
+const fmtK = (n: number) =>
+  n >= 1_00_00_000 ? `₹${(n/1_00_00_000).toFixed(1)}Cr`
+  : n >= 1_00_000 ? `₹${(n/1_00_000).toFixed(1)}L`
+  : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
+
+// ── Inline Chart Block ────────────────────────────────────────────────────────
+function ChatInlineChart({ chart }: { chart: ChartData }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '14px 16px', marginTop: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{chart.title}</div>
+      <ResponsiveContainer width="100%" height={180}>
+        {chart.type === 'pie' ? (
+          <PieChart>
+            <Pie data={chart.data} cx="50%" cy="45%" innerRadius={40} outerRadius={68} paddingAngle={3} dataKey="value" nameKey="name">
+              {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
+            </Pie>
+            <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+            <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          </PieChart>
+        ) : chart.type === 'line' ? (
+          <LineChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+            <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+            <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+            <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+            {Object.keys(chart.data[0] || {}).filter(k => k !== 'name').map((k, i) => (
+              <Line key={k} type="monotone" dataKey={k} stroke={CHAT_COLORS[i]} strokeWidth={2} dot={{ r: 3 }} />
+            ))}
+          </LineChart>
+        ) : (
+          <BarChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }} barCategoryGap="35%">
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+            <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+            <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+            <Bar dataKey="value" radius={[4,4,0,0]}>
+              {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
+            </Bar>
+          </BarChart>
+        )}
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 // ── WhatsApp icon ─────────────────────────────────────────────────────────────
 const WA_ICON = () => (
@@ -184,7 +243,7 @@ export default function ChatbotPage() {
       setSessionId(data.sessionId);
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: data.response, leadCards: data.leadCards },
+        { role: 'assistant', content: data.response, leadCards: data.leadCards, chartData: data.chartData },
       ]);
     },
     onError: (err: any) => {
@@ -251,6 +310,11 @@ export default function ChatbotPage() {
               }`} style={{ whiteSpace: 'pre-wrap' }}>
                 {msg.content}
               </div>
+
+              {/* ── Inline Chart ── */}
+              {msg.role === 'assistant' && msg.chartData && (
+                <ChatInlineChart chart={msg.chartData} />
+              )}
 
               {/* ── WhatsApp Lead Cards (only on assistant messages) ── */}
               {msg.role === 'assistant' && msg.leadCards && msg.leadCards.length > 0 && (
