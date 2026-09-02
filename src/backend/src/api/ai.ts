@@ -6,7 +6,7 @@ import { z } from 'zod';
 export const aiRouter = Router();
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-const OPENROUTER_MODEL   = process.env.OPENROUTER_MODEL   || 'openai/gpt-4o';
+const OPENROUTER_MODEL   = process.env.OPENROUTER_MODEL   || 'minimax/minimax-m3:free';
 
 const chatSchema = z.object({
   sessionId: z.string().uuid().nullish(),
