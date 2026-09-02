@@ -1,16 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, Download, BarChart2 } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+  AreaChart, Area, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 interface ChartData {
-  type: 'bar' | 'pie' | 'line';
+  type: 'bar' | 'pie' | 'line' | 'area' | 'donut' | 'horizontal_bar' | 'composed';
   title: string;
   data: any[];
+  keys?: string[];   // for multi-key line/area/bar
 }
 
 interface Message {
@@ -32,56 +36,179 @@ interface LeadCard {
 
 const suggestions = [
   'Aaj ki sale kitni hai?',
+  'Is mahine ka profit chart dikhao',
+  'Top products ka bar chart dikhao',
+  'Payment status pie chart dikhao',
   'WhatsApp pe kaun customer ban sakta hai?',
-  'Is mahine ka profit kya hai?',
-  'Georgette ka stock kitna hai?',
-  'Pending payments list karo',
-  'Hot WhatsApp leads dikhao',
+  'Stock distribution dikhao',
 ];
 
-// ── Inline chart colours ─────────────────────────────────────────────────────
-const CHAT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899'];
+// ── Chart colours ────────────────────────────────────────────────────────────
+const CHAT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
 const fmtK = (n: number) =>
   n >= 1_00_00_000 ? `₹${(n/1_00_00_000).toFixed(1)}Cr`
   : n >= 1_00_000 ? `₹${(n/1_00_000).toFixed(1)}L`
   : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
 
+// ── Export chart data ────────────────────────────────────────────────────────
+function exportChartCSV(chart: ChartData) {
+  if (!chart.data.length) return;
+  const headers = Object.keys(chart.data[0]);
+  const rows = chart.data.map(r => headers.map(h => String(r[h] ?? '')).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  saveAs(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }), `${chart.title.replace(/\s+/g,'_')}.csv`);
+}
+
+function exportChartExcel(chart: ChartData) {
+  if (!chart.data.length) return;
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(chart.data);
+  XLSX.utils.book_append_sheet(wb, ws, chart.title.slice(0, 31));
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  saveAs(new Blob([buf], { type: 'application/octet-stream' }), `${chart.title.replace(/\s+/g,'_')}.xlsx`);
+}
+
 // ── Inline Chart Block ────────────────────────────────────────────────────────
 function ChatInlineChart({ chart }: { chart: ChartData }) {
-  return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '14px 16px', marginTop: 8 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{chart.title}</div>
-      <ResponsiveContainer width="100%" height={180}>
-        {chart.type === 'pie' ? (
-          <PieChart>
-            <Pie data={chart.data} cx="50%" cy="45%" innerRadius={40} outerRadius={68} paddingAngle={3} dataKey="value" nameKey="name">
-              {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={(v: any) => fmtK(Number(v))} />
-            <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
-          </PieChart>
-        ) : chart.type === 'line' ? (
-          <LineChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-            <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
-            <Tooltip formatter={(v: any) => fmtK(Number(v))} />
-            <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
-            {Object.keys(chart.data[0] || {}).filter(k => k !== 'name').map((k, i) => (
-              <Line key={k} type="monotone" dataKey={k} stroke={CHAT_COLORS[i]} strokeWidth={2} dot={{ r: 3 }} />
+  const [showExport, setShowExport] = useState(false);
+
+  // Determine data keys (everything except 'name')
+  const dataKeys = chart.keys || (chart.data[0] ? Object.keys(chart.data[0]).filter(k => k !== 'name') : ['value']);
+
+  const renderChart = () => {
+    if (chart.type === 'pie' || chart.type === 'donut') {
+      const inner = chart.type === 'donut' ? 38 : 0;
+      return (
+        <PieChart>
+          <Pie data={chart.data} cx="50%" cy="45%" innerRadius={inner} outerRadius={68} paddingAngle={3} dataKey="value" nameKey="name">
+            {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
+          </Pie>
+          <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+        </PieChart>
+      );
+    }
+
+    if (chart.type === 'horizontal_bar') {
+      return (
+        <BarChart data={chart.data} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }} barCategoryGap="28%">
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+          <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} width={90} />
+          <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+          <Bar dataKey="value" radius={[0,4,4,0]}>
+            {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
+          </Bar>
+        </BarChart>
+      );
+    }
+
+    if (chart.type === 'area') {
+      return (
+        <AreaChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            {dataKeys.map((k, i) => (
+              <linearGradient key={k} id={`areaGrad${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={CHAT_COLORS[i]} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={CHAT_COLORS[i]} stopOpacity={0} />
+              </linearGradient>
             ))}
-          </LineChart>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+          <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          {dataKeys.map((k, i) => (
+            <Area key={k} type="monotone" dataKey={k} name={k} stroke={CHAT_COLORS[i]} fill={`url(#areaGrad${i})`} strokeWidth={2} dot={{ r: 3 }} />
+          ))}
+        </AreaChart>
+      );
+    }
+
+    if (chart.type === 'composed') {
+      const [k1, k2, ...rest] = dataKeys;
+      return (
+        <ComposedChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+          <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          {k1 && <Bar dataKey={k1} name={k1} fill={CHAT_COLORS[0]} radius={[4,4,0,0]} />}
+          {k2 && <Line type="monotone" dataKey={k2} name={k2} stroke={CHAT_COLORS[1]} strokeWidth={2} dot={{ r: 3 }} />}
+          {rest.map((k, i) => <Line key={k} type="monotone" dataKey={k} name={k} stroke={CHAT_COLORS[i+2]} strokeWidth={2} dot={{ r: 3 }} />)}
+        </ComposedChart>
+      );
+    }
+
+    if (chart.type === 'line') {
+      return (
+        <LineChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+          <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          {dataKeys.map((k, i) => (
+            <Line key={k} type="monotone" dataKey={k} name={k} stroke={CHAT_COLORS[i]} strokeWidth={2} dot={{ r: 3 }} />
+          ))}
+        </LineChart>
+      );
+    }
+
+    // Default: bar
+    return (
+      <BarChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }} barCategoryGap="35%">
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+        <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+        <Tooltip formatter={(v: any) => fmtK(Number(v))} />
+        {dataKeys.length > 1 ? (
+          <>
+            <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+            {dataKeys.map((k, i) => <Bar key={k} dataKey={k} name={k} fill={CHAT_COLORS[i]} radius={[4,4,0,0]} />)}
+          </>
         ) : (
-          <BarChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }} barCategoryGap="35%">
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-            <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
-            <Tooltip formatter={(v: any) => fmtK(Number(v))} />
-            <Bar dataKey="value" radius={[4,4,0,0]}>
-              {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
-            </Bar>
-          </BarChart>
+          <Bar dataKey={dataKeys[0] || 'value'} radius={[4,4,0,0]}>
+            {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
+          </Bar>
         )}
+      </BarChart>
+    );
+  };
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '14px 16px', marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <BarChart2 size={13} color="#6366f1" />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{chart.title}</span>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowExport(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 7, border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 11, color: '#64748b', cursor: 'pointer' }}
+          >
+            <Download size={11} /> Export
+          </button>
+          {showExport && (
+            <div style={{ position: 'absolute', right: 0, top: 28, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', zIndex: 100, padding: '4px 0', minWidth: 130 }}>
+              {[
+                { label: 'Excel (.xlsx)', fn: () => { exportChartExcel(chart); setShowExport(false); } },
+                { label: 'CSV (.csv)',    fn: () => { exportChartCSV(chart);   setShowExport(false); } },
+              ].map(opt => (
+                <button key={opt.label} onClick={opt.fn} style={{ display: 'block', width: '100%', padding: '8px 14px', fontSize: 12, color: '#1e293b', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >{opt.label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={190}>
+        {renderChart()}
       </ResponsiveContainer>
     </div>
   );
@@ -169,7 +296,6 @@ function ConvertLeadModal({ card, onClose, onSuccess }: { card: LeadCard; onClos
   const mut = useMutation({
     mutationFn: () =>
       api.get(`/api/v1/messages/inbox?limit=100`).then(async r => {
-        // Find the latest message from this phone number
         const msg = (r.data?.data || []).find((m: any) => m.fromAddress === card.phone);
         if (!msg) throw new Error('Message not found in inbox');
         return api.patch(`/api/v1/messages/${msg.id}/convert-lead`, {
@@ -222,7 +348,7 @@ export default function ChatbotPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Namaste! Main aapka AI business assistant hoon. Aap mujhse apne business ke baare mein kuch bhi pooch sakte hain.\n\n💡 WhatsApp pe aaye messages mein se potential customers detect karne ke liye poochein: "WhatsApp pe kaun customer ban sakta hai?"',
+      content: 'Namaste! Main aapka AI business assistant hoon. Aap mujhse apne business ke baare mein kuch bhi pooch sakte hain.\n\n💡 Charts ke liye poochein: "Top products ka bar chart", "Payment status pie chart", "Monthly sales trend"\n💡 WhatsApp leads ke liye: "WhatsApp pe kaun customer ban sakta hai?"',
     },
   ]);
   const [input, setInput]         = useState('');
@@ -281,7 +407,7 @@ export default function ChatbotPage() {
           </div>
           <div>
             <h1 className="text-sm font-bold text-gray-900 leading-tight">AI Business Assistant</h1>
-            <p className="text-xs text-gray-400 leading-tight">WhatsApp leads · Sales · Stock · Payments</p>
+            <p className="text-xs text-gray-400 leading-tight">WhatsApp leads · Charts · Sales · Stock · Payments</p>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
@@ -302,7 +428,7 @@ export default function ChatbotPage() {
                 : <Bot size={13} className="text-blue-600" />
               }
             </div>
-            <div style={{ maxWidth: '76%' }}>
+            <div style={{ maxWidth: '78%' }}>
               <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-blue-600 text-white rounded-tr-sm shadow-sm'
@@ -312,11 +438,11 @@ export default function ChatbotPage() {
               </div>
 
               {/* ── Inline Chart ── */}
-              {msg.role === 'assistant' && msg.chartData && (
+              {msg.role === 'assistant' && msg.chartData && msg.chartData.data?.length > 0 && (
                 <ChatInlineChart chart={msg.chartData} />
               )}
 
-              {/* ── WhatsApp Lead Cards (only on assistant messages) ── */}
+              {/* ── WhatsApp Lead Cards ── */}
               {msg.role === 'assistant' && msg.leadCards && msg.leadCards.length > 0 && (
                 <div style={{ marginTop: 4 }}>
                   <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 4, paddingLeft: 2 }}>
@@ -355,7 +481,7 @@ export default function ChatbotPage() {
 
       {/* Suggestions */}
       <div className="px-4 py-2.5 bg-white border-t border-gray-100 flex-shrink-0">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5">
+        <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
           {suggestions.map((s) => (
             <button
               key={s}
@@ -378,7 +504,7 @@ export default function ChatbotPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder="Kuch bhi poochein — WhatsApp leads, sales, stock..."
+            placeholder="Kuch bhi poochein — charts, leads, sales, stock..."
             className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white"
           />
           <button

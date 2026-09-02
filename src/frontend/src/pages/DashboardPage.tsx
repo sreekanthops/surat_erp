@@ -3,11 +3,15 @@ import api from '@/hooks/useApi';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ComposedChart, Line,
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, MessageSquare, Users,
-  Package, AlertCircle, ArrowUpRight, ArrowDownRight,
+  Package, AlertCircle, ArrowUpRight, ArrowDownRight, Download,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
@@ -63,6 +67,29 @@ const Skeleton = ({ h = 200 }: { h?: number }) => (
   <div style={{ height: h, background: 'linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)', borderRadius: 12, backgroundSize: '400% 100%', animation: 'shimmer 1.4s ease infinite' }} />
 );
 
+const exportDashboardExcel = (charts: any) => {
+  if (!charts) return;
+  const wb = XLSX.utils.book_new();
+  if (charts.daily30?.length) {
+    const ws = XLSX.utils.json_to_sheet(charts.daily30.map((r: any) => ({ Date: r.day, 'Amount (₹)': r.amount, 'Orders': r.count })));
+    XLSX.utils.book_append_sheet(wb, ws, 'Daily Sales');
+  }
+  if (charts.monthlyTrend?.length) {
+    const ws2 = XLSX.utils.json_to_sheet(charts.monthlyTrend.map((r: any) => ({ Month: r.month, 'Sales (₹)': r.sales, 'Purchases (₹)': r.purchases })));
+    XLSX.utils.book_append_sheet(wb, ws2, 'Monthly Trend');
+  }
+  if (charts.topProducts?.length) {
+    const ws3 = XLSX.utils.json_to_sheet(charts.topProducts.map((r: any) => ({ Product: r.name, 'Revenue (₹)': r.revenue, 'Qty': r.qty })));
+    XLSX.utils.book_append_sheet(wb, ws3, 'Top Products');
+  }
+  if (charts.statusPie?.length) {
+    const ws4 = XLSX.utils.json_to_sheet(charts.statusPie.map((r: any) => ({ Status: r.name, 'Amount (₹)': r.value, 'Count': r.count })));
+    XLSX.utils.book_append_sheet(wb, ws4, 'Invoice Status');
+  }
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  saveAs(new Blob([buf], { type: 'application/octet-stream' }), `Dashboard_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
 export default function DashboardPage() {
   const { data: summary, isLoading: loadSum } = useQuery({
     queryKey: ['dashboard-summary'],
@@ -110,11 +137,20 @@ export default function DashboardPage() {
       <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>Dashboard</h1>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-          {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>Dashboard</h1>
+          <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        <button
+          onClick={() => exportDashboardExcel(charts)}
+          disabled={loadCharts || !charts}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 11, border: '1.5px solid #16a34a22', background: '#16a34a0d', color: '#16a34a', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+        >
+          <Download size={14} /> Export Excel
+        </button>
       </div>
 
       {/* KPI Row */}
@@ -219,22 +255,77 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: Top Products Bar */}
+      {/* Row 3: Top Products Horizontal Bar + Radar */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 18, marginBottom: 18 }}>
+        <div style={card()}>
+          {sectionTitle('Top Products by Revenue', 'This month')}
+          {loadCharts ? <Skeleton h={200} /> : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={charts?.topProducts ?? []} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }} barCategoryGap="25%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} tickLine={false} axisLine={false} width={130} />
+                <Tooltip formatter={(v: any) => fmtK(v)} />
+                <Bar dataKey="revenue" name="Revenue" radius={[0,6,6,0]}>
+                  {(charts?.topProducts ?? []).map((_: any, i: number) => (
+                    <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Radar — product performance */}
+        <div style={card()}>
+          {sectionTitle('Product Radar', 'Revenue vs Qty ratio')}
+          {loadCharts ? <Skeleton h={200} /> : (
+            <ResponsiveContainer width="100%" height={200}>
+              <RadarChart data={(charts?.topProducts ?? []).map((p: any) => ({
+                product: (p.name || '').split(' ').slice(0,2).join(' '),
+                revenue: Math.round((p.revenue || 0) / 1000),
+                qty: Math.round((p.qty || 0) / 10),
+              }))}>
+                <PolarGrid stroke="#e5e7eb" />
+                <PolarAngleAxis dataKey="product" tick={{ fontSize: 9, fill: '#64748b' }} />
+                <PolarRadiusAxis tick={false} axisLine={false} />
+                <Radar name="Revenue (K)" dataKey="revenue" stroke="#6366f1" fill="#6366f1" fillOpacity={0.25} />
+                <Radar name="Qty (×10)" dataKey="qty" stroke="#10b981" fill="#10b981" fillOpacity={0.25} />
+                <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+                <Tooltip />
+              </RadarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Row 4: Composed Sales+Profit Line+Bar */}
       <div style={{ ...card(), marginBottom: 18 }}>
-        {sectionTitle('Top Products by Revenue', 'This month')}
-        {loadCharts ? <Skeleton h={200} /> : (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={charts?.topProducts ?? []} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }} barCategoryGap="25%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-              <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} tickLine={false} axisLine={false} width={130} />
-              <Tooltip formatter={(v: any) => fmtK(v)} />
-              <Bar dataKey="revenue" name="Revenue" radius={[0,6,6,0]}>
-                {(charts?.topProducts ?? []).map((_: any, i: number) => (
-                  <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
+        {sectionTitle('Sales & Profit Trend', 'Monthly composed view')}
+        {loadCharts ? <Skeleton h={180} /> : (
+          <ResponsiveContainer width="100%" height={180}>
+            <ComposedChart
+              data={(charts?.monthlyTrend ?? []).map((r: any) => ({
+                ...r,
+                profit: (r.sales || 0) - (r.purchases || 0),
+              }))}
+              margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="compGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+              <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={52} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend iconType="circle" iconSize={8} formatter={(v: string) => <span style={{ fontSize: 11, color: '#475569', textTransform: 'capitalize' }}>{v}</span>} />
+              <Bar dataKey="profit" name="Profit" fill="#10b981" opacity={0.8} radius={[4,4,0,0]} />
+              <Line type="monotone" dataKey="sales" name="Sales" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 4, fill: '#6366f1' }} />
+              <Line type="monotone" dataKey="purchases" name="Purchases" stroke="#f59e0b" strokeWidth={2} strokeDasharray="4 2" dot={false} />
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>

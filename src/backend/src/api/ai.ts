@@ -211,14 +211,22 @@ WHATSAPP LEAD DETECTION RULES:
 
 CHART / STATISTICS RULES:
 - When asked about trends, charts, graphs, statistics, sales over time, top products, stock distribution, payment breakdown — respond with text summary AND append chart data
-- Append chart data at the END of your response as: "CHART_DATA_JSON:" followed by JSON like:
-  {"type":"bar","title":"Daily Sales Last 7 Days","data":[{"name":"01 Jun","value":45000},{"name":"02 Jun","value":62000}]}
+- Append chart data at the END of your response as: "CHART_DATA_JSON:" followed by a SINGLE JSON object like:
+  {"type":"bar","title":"Top Products by Revenue","data":[{"name":"Georgette 4-Way","value":284000},{"name":"Banarasi Silk","value":198000}]}
   OR {"type":"pie","title":"Payment Status","data":[{"name":"PAID","value":150000},{"name":"PENDING","value":80000}]}
-  OR {"type":"line","title":"Monthly Trend","data":[{"name":"Apr","sales":200000,"purchases":120000}]}
-- For top products: use type "bar" with name=product name, value=revenue
-- For payment status: use type "pie"
-- For trends over time: use type "line" or "bar"
+  OR {"type":"donut","title":"Invoice Status Breakdown","data":[{"name":"PAID","value":150000},{"name":"PENDING","value":80000}]}
+  OR {"type":"line","title":"Monthly Sales Trend","data":[{"name":"Apr","sales":200000,"purchases":120000}],"keys":["sales","purchases"]}
+  OR {"type":"area","title":"Revenue Last 6 Months","data":[{"name":"Apr","sales":200000,"purchases":120000}],"keys":["sales","purchases"]}
+  OR {"type":"horizontal_bar","title":"Top Outstanding Balances","data":[{"name":"Sharma Traders","value":45000}]}
+  OR {"type":"composed","title":"Monthly Profit Overview","data":[{"name":"Apr","profit":80000,"sales":200000}],"keys":["profit","sales"]}
+- Use "donut" for status/category breakdowns, "area" for time trends, "horizontal_bar" for party/product rankings, "composed" for mixed bar+line
+- For top products: use type "bar" or "horizontal_bar" with name=product name, value=revenue
+- For payment status: use type "donut" or "pie"
+- For trends over time: use type "area" or "line"
+- For stock levels: use type "bar" with name=product, value=currentStock
+- For outstanding balances: use type "horizontal_bar"
 - Only include CHART_DATA_JSON when you have actual numbers to show — skip if purely conversational
+- The JSON must be valid — no trailing commas, no comments
 
 - Today's date: ${today}`;
 }
@@ -263,11 +271,23 @@ aiRouter.post('/chat', async (req, res, next) => {
       try { leadCards = JSON.parse(leadMatch[1]); } catch { /* ignore */ }
     }
 
-    // Extract chart JSON
+    // Extract chart JSON — handle multi-line and optional keys field
     let chartData: any | null = null;
-    const chartMatch = rawResponse.match(/CHART_DATA_JSON:\s*(\{[\s\S]*?\})(?:\s*$)/);
-    if (chartMatch) {
-      try { chartData = JSON.parse(chartMatch[1]); } catch { /* ignore */ }
+    const chartIdx = rawResponse.indexOf('CHART_DATA_JSON:');
+    if (chartIdx !== -1) {
+      const afterTag = rawResponse.slice(chartIdx + 'CHART_DATA_JSON:'.length).trimStart();
+      const braceStart = afterTag.indexOf('{');
+      if (braceStart !== -1) {
+        // Find matching closing brace
+        let depth = 0, end = -1;
+        for (let i = braceStart; i < afterTag.length; i++) {
+          if (afterTag[i] === '{') depth++;
+          else if (afterTag[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        if (end !== -1) {
+          try { chartData = JSON.parse(afterTag.slice(braceStart, end + 1)); } catch { /* ignore */ }
+        }
+      }
     }
 
     // Strip JSON tags from displayed text

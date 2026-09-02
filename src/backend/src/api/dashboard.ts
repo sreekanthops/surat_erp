@@ -19,33 +19,33 @@ dashboardRouter.get('/charts', async (req, res, next) => {
 
     const [dailyRaw, topProductsRaw, statusBreakdown, categoryRaw, monthlyTrendRaw, prevMonth] = await Promise.all([
 
-      // Daily sales last 30 days
+      // Daily sales last 30 days — camelCase cols (Prisma default)
       prisma.$queryRawUnsafe(`
-        SELECT DATE(date) as day, SUM(total_amount)::float as amount, COUNT(*)::int as count
+        SELECT DATE(date) as day, SUM("totalAmount")::float as amount, COUNT(*)::int as count
         FROM transactions
-        WHERE tenant_id = '${tenantId}'::uuid
-          AND type = 'SALE'
+        WHERE "tenantId" = '${tenantId}'::uuid
+          AND type = 'SALE'::"TransactionType"
           AND date >= $1
-          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND group_id IS NULL' : `AND group_id = '${gf.groupId}'::uuid`}
+          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND "groupId" IS NULL' : `AND "groupId" = '${gf.groupId}'::uuid`}
         GROUP BY DATE(date) ORDER BY day
       `, day30ago) as Promise<any[]>,
 
       // Top 6 products by revenue this month
       prisma.$queryRawUnsafe(`
-        SELECT ti.product_name as name,
-               SUM(ti.total_amount)::float as revenue,
+        SELECT ti."productName" as name,
+               SUM(ti."totalAmount")::float as revenue,
                SUM(ti.quantity)::float as qty
         FROM transaction_items ti
-        JOIN transactions t ON t.id = ti.transaction_id
-        WHERE t.tenant_id = '${tenantId}'::uuid
-          AND t.type = 'SALE'
+        JOIN transactions t ON t.id = ti."transactionId"
+        WHERE t."tenantId" = '${tenantId}'::uuid
+          AND t.type = 'SALE'::"TransactionType"
           AND t.date >= $1
-          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND t.group_id IS NULL' : `AND t.group_id = '${gf.groupId}'::uuid`}
-        GROUP BY ti.product_name
+          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND t."groupId" IS NULL' : `AND t."groupId" = '${gf.groupId}'::uuid`}
+        GROUP BY ti."productName"
         ORDER BY revenue DESC LIMIT 6
       `, monthStart) as Promise<any[]>,
 
-      // Payment status breakdown (all time, last 90 days)
+      // Payment status breakdown last 90 days
       prisma.transaction.groupBy({
         by: ['status'],
         where: { tenantId, ...gf, type: TransactionType.SALE, date: { gte: new Date(now.getTime() - 90*86400000) } },
@@ -56,14 +56,14 @@ dashboardRouter.get('/charts', async (req, res, next) => {
       // Sales by product category this month
       prisma.$queryRawUnsafe(`
         SELECT COALESCE(p.category, 'Other') as category,
-               SUM(ti.total_amount)::float as revenue
+               SUM(ti."totalAmount")::float as revenue
         FROM transaction_items ti
-        JOIN transactions t ON t.id = ti.transaction_id
-        LEFT JOIN products p ON p.id = ti.product_id
-        WHERE t.tenant_id = '${tenantId}'::uuid
-          AND t.type = 'SALE'
+        JOIN transactions t ON t.id = ti."transactionId"
+        LEFT JOIN products p ON p.id = ti."productId"
+        WHERE t."tenantId" = '${tenantId}'::uuid
+          AND t.type = 'SALE'::"TransactionType"
           AND t.date >= $1
-          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND t.group_id IS NULL' : `AND t.group_id = '${gf.groupId}'::uuid`}
+          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND t."groupId" IS NULL' : `AND t."groupId" = '${gf.groupId}'::uuid`}
         GROUP BY COALESCE(p.category, 'Other')
         ORDER BY revenue DESC
       `, monthStart) as Promise<any[]>,
@@ -72,12 +72,12 @@ dashboardRouter.get('/charts', async (req, res, next) => {
       prisma.$queryRawUnsafe(`
         SELECT TO_CHAR(DATE_TRUNC('month', date), 'Mon YY') as month,
                DATE_TRUNC('month', date) as month_date,
-               SUM(CASE WHEN type='SALE' THEN total_amount ELSE 0 END)::float as sales,
-               SUM(CASE WHEN type='PURCHASE' THEN total_amount ELSE 0 END)::float as purchases
+               SUM(CASE WHEN type='SALE'::"TransactionType" THEN "totalAmount" ELSE 0 END)::float as sales,
+               SUM(CASE WHEN type='PURCHASE'::"TransactionType" THEN "totalAmount" ELSE 0 END)::float as purchases
         FROM transactions
-        WHERE tenant_id = '${tenantId}'::uuid
+        WHERE "tenantId" = '${tenantId}'::uuid
           AND date >= $1
-          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND group_id IS NULL' : `AND group_id = '${gf.groupId}'::uuid`}
+          ${gf.groupId === undefined ? '' : gf.groupId === null ? 'AND "groupId" IS NULL' : `AND "groupId" = '${gf.groupId}'::uuid`}
         GROUP BY DATE_TRUNC('month', date), TO_CHAR(DATE_TRUNC('month', date), 'Mon YY')
         ORDER BY month_date
       `, new Date(now.getFullYear(), now.getMonth() - 5, 1)) as Promise<any[]>,
