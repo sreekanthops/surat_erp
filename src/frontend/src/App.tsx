@@ -6,6 +6,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import InventoryPage from '@/pages/InventoryPage';
 import SalesPage from '@/pages/SalesPage';
 import InboxPage from '@/pages/InboxPage';
+import GmailPage from '@/pages/GmailPage';
 import LeadsPage from '@/pages/LeadsPage';
 import PartiesPage from '@/pages/PartiesPage';
 import ReportsPage from '@/pages/ReportsPage';
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="sales" element={<SalesPage />} />
         <Route path="inbox" element={<InboxPage />} />
+        <Route path="gmail" element={<GmailPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="parties" element={<PartiesPage />} />
         <Route path="reports" element={<ReportsPage />} />

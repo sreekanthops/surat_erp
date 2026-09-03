@@ -66,7 +66,7 @@ const STATUS_STYLES: Record<string, React.CSSProperties> = {
   PENDING:   { background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa' },
   PARTIAL:   { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' },
   PAID:      { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' },
-  CANCELLED: { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' },
+  CANCELLED: { background: '#f8f9fc', color: '#4b5563', border: '1px solid #e4e7ef' },
 };
 
 const PAYMENT_MODES = ['cash', 'upi', 'neft', 'cheque', 'credit'];
@@ -78,12 +78,12 @@ const BLANK_ITEM: LineItem = { productId: '', productName: '', qty: 1, rate: 0, 
 const SkeletonRow = () => (
   <tr>
     {[...Array(9)].map((_, i) => (
-      <td key={i} style={{ padding: '14px 16px' }}>
+      <td key={i} style={{ padding: '13px 16px' }}>
         <div style={{
-          height: '14px', borderRadius: '6px',
-          background: 'linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 1.4s infinite',
+          height: '13px', borderRadius: '6px',
+          background: 'linear-gradient(90deg, #f0f2f8 25%, #e8eaf2 50%, #f0f2f8 75%)',
+          backgroundSize: '400% 100%',
+          animation: 'skeleton-shimmer 1.5s ease infinite',
           width: i === 2 ? '140px' : i === 7 ? '70px' : '80px',
         }} />
       </td>
@@ -93,12 +93,12 @@ const SkeletonRow = () => (
 
 const SkeletonStatCard = () => (
   <div style={{
-    background: '#fff', borderRadius: '16px', padding: '22px',
-    border: '1px solid #f1f5f9',
-    boxShadow: '0 2px 12px rgba(15,23,42,0.05)',
+    background: '#fff', borderRadius: '14px', padding: '20px',
+    border: '1px solid #e4e7ef',
+    boxShadow: '0 2px 8px rgba(17,24,39,0.05)',
   }}>
-    <div style={{ height: '12px', width: '100px', borderRadius: '6px', background: '#f1f5f9', marginBottom: '12px' }} />
-    <div style={{ height: '28px', width: '140px', borderRadius: '8px', background: '#e2e8f0' }} />
+    <div style={{ height: '11px', width: '90px', borderRadius: '6px', background: '#f0f2f8', marginBottom: '12px' }} />
+    <div style={{ height: '26px', width: '130px', borderRadius: '7px', background: '#e8eaf2' }} />
   </div>
 );
 
@@ -148,21 +148,21 @@ function SearchableSelect<T extends { id: string; name: string }>({
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '9px 12px', borderRadius: '10px', fontSize: '13.5px',
-          border: '1.5px solid #e2e8f0', background: disabled ? '#f8fafc' : '#fff',
-          color: selected ? '#1e293b' : '#94a3b8', cursor: disabled ? 'not-allowed' : 'pointer',
+          border: '1.5px solid #e4e7ef', background: disabled ? '#f8f9fc' : '#fff',
+          color: selected ? '#1a2235' : '#9ca3af', cursor: disabled ? 'not-allowed' : 'pointer',
           outline: 'none', textAlign: 'left',
         }}
       >
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {selected ? selected.name : placeholder}
         </span>
-        <ChevronDown size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
+        <ChevronDown size={14} color="#9ca3af" style={{ flexShrink: 0 }} />
       </button>
       {open && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999,
           background: '#fff', borderRadius: '12px', marginTop: '4px',
-          boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid #e2e8f0',
+          boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid #e4e7ef',
           overflow: 'hidden',
         }}>
           <div style={{ padding: '8px' }}>
@@ -173,13 +173,13 @@ function SearchableSelect<T extends { id: string; name: string }>({
               placeholder="Search..."
               style={{
                 width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '13px',
-                border: '1.5px solid #e2e8f0', outline: 'none', boxSizing: 'border-box',
+                border: '1.5px solid #e4e7ef', outline: 'none', boxSizing: 'border-box',
               }}
             />
           </div>
           <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: '12px 14px', fontSize: '13px', color: '#94a3b8' }}>No results</div>
+              <div style={{ padding: '12px 14px', fontSize: '13px', color: '#9ca3af' }}>No results</div>
             ) : filtered.map(item => (
               <button
                 key={item.id}
@@ -188,11 +188,11 @@ function SearchableSelect<T extends { id: string; name: string }>({
                 style={{
                   width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: '13.5px',
                   background: item.id === value ? '#eff6ff' : 'transparent',
-                  color: item.id === value ? '#2563eb' : '#1e293b',
+                  color: item.id === value ? '#2563eb' : '#1a2235',
                   border: 'none', cursor: 'pointer', fontWeight: item.id === value ? 600 : 400,
                   display: 'block',
                 }}
-                onMouseEnter={e => { if (item.id !== value) (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc'; }}
+                onMouseEnter={e => { if (item.id !== value) (e.currentTarget as HTMLButtonElement).style.background = '#f8f9fc'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = item.id === value ? '#eff6ff' : 'transparent'; }}
               >
                 {item.name}
@@ -212,12 +212,12 @@ const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     {...props}
     style={{
       width: '100%', padding: '9px 12px', borderRadius: '10px', fontSize: '13.5px',
-      border: '1.5px solid #e2e8f0', outline: 'none', boxSizing: 'border-box',
-      color: '#1e293b', background: props.disabled ? '#f8fafc' : '#fff',
+      border: '1.5px solid #e4e7ef', outline: 'none', boxSizing: 'border-box',
+      color: '#1a2235', background: props.disabled ? '#f8f9fc' : '#fff',
       ...(props.style || {}),
     }}
-    onFocus={e => { e.currentTarget.style.borderColor = '#6366f1'; }}
-    onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
+    onFocus={e => { e.currentTarget.style.borderColor = '#5b5bd6'; }}
+    onBlur={e => { e.currentTarget.style.borderColor = '#e4e7ef'; }}
   />
 );
 
@@ -226,15 +226,15 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     {...props}
     style={{
       width: '100%', padding: '9px 12px', borderRadius: '10px', fontSize: '13.5px',
-      border: '1.5px solid #e2e8f0', outline: 'none', background: '#fff',
-      color: '#1e293b', cursor: 'pointer', boxSizing: 'border-box',
+      border: '1.5px solid #e4e7ef', outline: 'none', background: '#fff',
+      color: '#1a2235', cursor: 'pointer', boxSizing: 'border-box',
       ...(props.style || {}),
     }}
   />
 );
 
 const Label = ({ children }: { children: React.ReactNode }) => (
-  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '5px', letterSpacing: '0.03em' }}>
+  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '5px', letterSpacing: '0.03em' }}>
     {children}
   </label>
 );
@@ -333,24 +333,24 @@ function CreateInvoiceModal({
         {/* Modal Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px', borderBottom: '1px solid #f1f5f9',
+          padding: '20px 24px', borderBottom: '1px solid #f5f6fa',
           background: 'linear-gradient(135deg,#f8faff 0%,#f0f4ff 100%)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               width: '36px', height: '36px', borderRadius: '10px',
-              background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
+              background: 'linear-gradient(135deg,#5b5bd6,#4646b5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <FileText size={17} color="#fff" />
             </div>
             <div>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>New Invoice</div>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Create a sales invoice</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>New Invoice</div>
+              <div style={{ fontSize: '12px', color: '#4b5563' }}>Create a sales invoice</div>
             </div>
           </div>
           <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px' }}>
-            <X size={20} color="#64748b" />
+            <X size={20} color="#4b5563" />
           </button>
         </div>
 
@@ -378,20 +378,20 @@ function CreateInvoiceModal({
 
           {/* Line Items */}
           <div style={{
-            border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', marginBottom: '20px',
+            border: '1.5px solid #e4e7ef', borderRadius: '12px', overflow: 'hidden', marginBottom: '20px',
           }}>
-            <div style={{ background: '#f8fafc', padding: '10px 14px', borderBottom: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ background: '#f8f9fc', padding: '10px 14px', borderBottom: '1px solid #e4e7ef' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Line Items
               </span>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '580px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr style={{ borderBottom: '1px solid #f5f6fa' }}>
                     {['Product', 'Qty', 'Rate (₹)', 'Disc %', 'GST %', 'Amount', ''].map(h => (
                       <th key={h} style={{
-                        padding: '8px 10px', fontSize: '11px', fontWeight: 700, color: '#94a3b8',
+                        padding: '8px 10px', fontSize: '11px', fontWeight: 700, color: '#9ca3af',
                         textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.04em',
                       }}>{h}</th>
                     ))}
@@ -432,7 +432,7 @@ function CreateInvoiceModal({
                           style={{ padding: '7px 8px', textAlign: 'center' }}
                         />
                       </td>
-                      <td style={{ padding: '8px 10px', width: '90px', fontSize: '13px', fontWeight: 600, color: '#1e293b', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '8px 10px', width: '90px', fontSize: '13px', fontWeight: 600, color: '#1a2235', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {fmt(item.amount)}
                       </td>
                       <td style={{ padding: '8px 6px', width: '32px' }}>
@@ -451,13 +451,13 @@ function CreateInvoiceModal({
                 </tbody>
               </table>
             </div>
-            <div style={{ padding: '8px 14px', borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ padding: '8px 14px', borderTop: '1px solid #f5f6fa' }}>
               <button
                 type="button"
                 onClick={() => setItems(prev => [...prev, { ...BLANK_ITEM }])}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  fontSize: '13px', fontWeight: 600, color: '#6366f1',
+                  fontSize: '13px', fontWeight: 600, color: '#5b5bd6',
                   border: '1.5px dashed #c7d2fe', borderRadius: '8px',
                   background: '#fafbff', padding: '6px 14px', cursor: 'pointer',
                 }}
@@ -472,18 +472,18 @@ function CreateInvoiceModal({
             display: 'flex', justifyContent: 'flex-end', marginBottom: '20px',
           }}>
             <div style={{
-              background: '#f8fafc', borderRadius: '12px', padding: '16px 20px',
-              minWidth: '240px', border: '1px solid #e2e8f0',
+              background: '#f8f9fc', borderRadius: '12px', padding: '16px 20px',
+              minWidth: '240px', border: '1px solid #e4e7ef',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>
-                <span>Subtotal</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(subtotal)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#4b5563', marginBottom: '8px' }}>
+                <span>Subtotal</span><span style={{ fontWeight: 600, color: '#1a2235' }}>{fmt(subtotal)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '10px' }}>
-                <span>GST</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(gstTotal)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#4b5563', marginBottom: '10px' }}>
+                <span>GST</span><span style={{ fontWeight: 600, color: '#1a2235' }}>{fmt(gstTotal)}</span>
               </div>
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Total</span>
-                <span style={{ fontSize: '16px', fontWeight: 800, color: '#4f46e5' }}>{fmt(total)}</span>
+              <div style={{ borderTop: '1px solid #e4e7ef', paddingTop: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>Total</span>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: '#4646b5' }}>{fmt(total)}</span>
               </div>
             </div>
           </div>
@@ -524,7 +524,7 @@ function CreateInvoiceModal({
               onClick={onClose}
               style={{
                 padding: '10px 20px', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600,
-                border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer',
+                border: '1.5px solid #e4e7ef', background: '#fff', color: '#4b5563', cursor: 'pointer',
               }}
             >
               Cancel
@@ -536,7 +536,7 @@ function CreateInvoiceModal({
               style={{
                 padding: '10px 24px', borderRadius: '10px', fontSize: '13.5px', fontWeight: 700,
                 border: 'none', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-                background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
+                background: 'linear-gradient(135deg,#5b5bd6,#4646b5)',
                 color: '#fff', boxShadow: '0 4px 16px rgba(99,102,241,0.4)',
                 display: 'flex', alignItems: 'center', gap: '8px',
               }}
@@ -593,13 +593,13 @@ function DeleteModal({
             <Trash2 size={20} color="#ef4444" />
           </div>
           <div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>Delete Invoice</div>
-            <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>This action cannot be undone</div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>Delete Invoice</div>
+            <div style={{ fontSize: '12.5px', color: '#4b5563', marginTop: '2px' }}>This action cannot be undone</div>
           </div>
         </div>
-        <p style={{ fontSize: '13.5px', color: '#475569', lineHeight: 1.6, marginBottom: '20px' }}>
-          Are you sure you want to delete invoice <strong style={{ color: '#1e293b' }}>{invoice.referenceNo}</strong> for{' '}
-          <strong style={{ color: '#1e293b' }}>{invoice.party.name}</strong>? All associated data will be permanently removed.
+        <p style={{ fontSize: '13.5px', color: '#4b5563', lineHeight: 1.6, marginBottom: '20px' }}>
+          Are you sure you want to delete invoice <strong style={{ color: '#1a2235' }}>{invoice.referenceNo}</strong> for{' '}
+          <strong style={{ color: '#1a2235' }}>{invoice.party.name}</strong>? All associated data will be permanently removed.
         </p>
         {error && (
           <div style={{
@@ -614,7 +614,7 @@ function DeleteModal({
             onClick={onClose}
             style={{
               padding: '9px 18px', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600,
-              border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer',
+              border: '1.5px solid #e4e7ef', background: '#fff', color: '#4b5563', cursor: 'pointer',
             }}
           >
             Cancel
@@ -691,20 +691,20 @@ function RecordPaymentModal({
               <DollarSign size={16} color="#fff" />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Record Payment</div>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>{invoice.party.name} · {invoice.referenceNo}</div>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>Record Payment</div>
+              <div style={{ fontSize: '12px', color: '#4b5563' }}>{invoice.party.name} · {invoice.referenceNo}</div>
             </div>
           </div>
           <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
-            <X size={18} color="#64748b" />
+            <X size={18} color="#4b5563" />
           </button>
         </div>
         <div style={{ padding: '20px 22px' }}>
           <div style={{
-            background: '#f8fafc', borderRadius: '10px', padding: '12px 16px',
+            background: '#f8f9fc', borderRadius: '10px', padding: '12px 16px',
             marginBottom: '18px', display: 'flex', justifyContent: 'space-between',
           }}>
-            <span style={{ fontSize: '12.5px', color: '#64748b' }}>Outstanding Due</span>
+            <span style={{ fontSize: '12.5px', color: '#4b5563' }}>Outstanding Due</span>
             <span style={{ fontSize: '15px', fontWeight: 800, color: '#ef4444' }}>{fmt(due)}</span>
           </div>
           <div style={{ marginBottom: '14px' }}>
@@ -739,7 +739,7 @@ function RecordPaymentModal({
               onClick={onClose}
               style={{
                 padding: '9px 16px', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600,
-                border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer',
+                border: '1.5px solid #e4e7ef', background: '#fff', color: '#4b5563', cursor: 'pointer',
               }}
             >
               Cancel
@@ -825,19 +825,19 @@ export default function SalesPage() {
   const statCards = [
     {
       label: 'This Month Sales', value: fmt(thisMonthTotal),
-      icon: TrendingUp, gradient: 'linear-gradient(135deg,#667eea,#764ba2)', shadow: 'rgba(102,126,234,0.35)',
+      icon: TrendingUp, gradient: 'linear-gradient(135deg, #5b5bd6 0%, #7c3aed 100%)', shadow: 'rgba(91,91,214,0.4)',
     },
     {
       label: 'Total Invoices', value: String(total),
-      icon: FileText, gradient: 'linear-gradient(135deg,#11998e,#38ef7d)', shadow: 'rgba(17,153,142,0.35)',
+      icon: FileText, gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', shadow: 'rgba(16,185,129,0.4)',
     },
     {
       label: 'Pending Amount', value: fmt(pendingAmt),
-      icon: Clock, gradient: 'linear-gradient(135deg,#f7971e,#ffd200)', shadow: 'rgba(247,151,30,0.35)',
+      icon: Clock, gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', shadow: 'rgba(245,158,11,0.4)',
     },
     {
       label: 'Paid Amount', value: fmt(paidAmt),
-      icon: CheckCircle, gradient: 'linear-gradient(135deg,#22c55e,#16a34a)', shadow: 'rgba(34,197,94,0.35)',
+      icon: CheckCircle, gradient: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', shadow: 'rgba(34,197,94,0.4)',
     },
   ];
 
@@ -860,43 +860,47 @@ export default function SalesPage() {
         .stat-card:hover { transform: translateY(-3px) !important; }
       `}</style>
 
-      <div style={{ padding: '32px', maxWidth: '1200px', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ padding: '28px 32px', fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif", background: '#f5f6fa', minHeight: '100vh' }}>
 
         {/* ── Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', gap: '16px' }}>
           <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>
+            <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#111827', margin: 0, lineHeight: 1.2, letterSpacing: '-0.03em' }}>
               Sales & Invoices
             </h1>
-            <p style={{ fontSize: '13px', color: '#64748b', marginTop: '5px' }}>
-              {currentMonth} · <strong style={{ color: '#4f46e5' }}>{fmt(thisMonthTotal)}</strong> in sales
+            <p style={{ fontSize: '13px', color: '#9ca3af', marginTop: '3px' }}>
+              {currentMonth} · <strong style={{ color: '#5b5bd6', fontWeight: 700 }}>{fmt(thisMonthTotal)}</strong> in sales
             </p>
           </div>
           <button
             onClick={() => setShowCreate(true)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '11px 20px', borderRadius: '12px', fontSize: '13.5px', fontWeight: 700,
-              border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
-              color: '#fff', boxShadow: '0 4px 16px rgba(99,102,241,0.4)',
-              transition: 'transform 0.15s, box-shadow 0.15s',
+              display: 'flex', alignItems: 'center', gap: '7px',
+              padding: '9px 18px', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600,
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: '#5b5bd6',
+              color: '#fff',
+              boxShadow: '0 2px 8px rgba(91,91,214,0.35), inset 0 1px 0 rgba(255,255,255,0.12)',
+              transition: 'all 0.15s ease',
+              letterSpacing: '-0.01em',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 24px rgba(99,102,241,0.5)';
+              (e.currentTarget as HTMLButtonElement).style.background = '#4646b5';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 14px rgba(91,91,214,0.45)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(99,102,241,0.4)';
+              (e.currentTarget as HTMLButtonElement).style.background = '#5b5bd6';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'none';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(91,91,214,0.35)';
             }}
           >
-            <Plus size={16} /> New Invoice
+            <Plus size={15} /> New Invoice
           </button>
         </div>
 
         {/* ── Stat Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '18px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '22px' }}>
           {invoicesQuery.isLoading
             ? [...Array(4)].map((_, i) => <SkeletonStatCard key={i} />)
             : statCards.map(({ label, value, icon: Icon, gradient, shadow }) => (
@@ -904,19 +908,24 @@ export default function SalesPage() {
                 key={label}
                 className="stat-card"
                 style={{
-                  background: gradient, borderRadius: '16px', padding: '20px 22px',
-                  boxShadow: `0 8px 28px ${shadow}`, color: '#fff',
+                  background: gradient, borderRadius: '14px', padding: '20px 22px',
+                  boxShadow: `0 6px 24px ${shadow}`, color: '#fff',
                   position: 'relative', overflow: 'hidden', cursor: 'default',
-                  transition: 'transform 0.2s ease',
+                  transition: 'transform 0.18s ease',
                 }}
               >
                 <div style={{
-                  fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.07em',
-                  textTransform: 'uppercase', opacity: 0.85, marginBottom: '10px',
+                  position: 'absolute', top: -20, right: -20,
+                  width: 80, height: 80, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.08)',
+                }} />
+                <div style={{
+                  fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em',
+                  textTransform: 'uppercase', opacity: 0.75, marginBottom: '10px',
                 }}>
                   {label}
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 800, lineHeight: 1 }}>{value}</div>
+                <div style={{ fontSize: '24px', fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>{value}</div>
                 <div style={{
                   position: 'absolute', top: '16px', right: '16px',
                   width: '38px', height: '38px', borderRadius: '10px',
@@ -931,10 +940,10 @@ export default function SalesPage() {
 
         {/* ── Filter Bar */}
         <div style={{
-          background: '#fff', borderRadius: '16px', padding: '16px 20px',
-          boxShadow: '0 2px 12px rgba(15,23,42,0.05)', border: '1px solid #f1f5f9',
+          background: '#fff', borderRadius: '14px', padding: '14px 18px',
+          boxShadow: '0 2px 8px rgba(17,24,39,0.05)', border: '1px solid #e4e7ef',
           display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end',
-          marginBottom: '20px',
+          marginBottom: '18px',
         }}>
           <div>
             <Label>From</Label>
@@ -962,7 +971,7 @@ export default function SalesPage() {
           <div style={{ flex: 1, minWidth: '200px' }}>
             <Label>Search</Label>
             <div style={{ position: 'relative' }}>
-              <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              <Search size={14} color="#9ca3af" style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               <Input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -976,7 +985,7 @@ export default function SalesPage() {
               onClick={() => { setFromDate(''); setToDate(''); setStatusFilter(''); setSearch(''); }}
               style={{
                 padding: '9px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
-                border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer',
+                border: '1.5px solid #e4e7ef', background: '#fff', color: '#4b5563', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '6px',
               }}
             >
@@ -987,21 +996,22 @@ export default function SalesPage() {
 
         {/* ── Table */}
         <div style={{
-          background: '#fff', borderRadius: '16px',
-          boxShadow: '0 2px 16px rgba(15,23,42,0.06)', border: '1px solid rgba(226,232,240,0.8)',
+          background: '#fff', borderRadius: '14px',
+          boxShadow: '0 2px 8px rgba(17,24,39,0.05)', border: '1px solid #e4e7ef',
           overflow: 'hidden',
         }}>
           {/* Table Header */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '14px 20px', borderBottom: '1px solid #f1f5f9', background: '#fafbff',
+            padding: '13px 18px', borderBottom: '1px solid #eff0f6', background: '#f8f9fc',
           }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#111827', letterSpacing: '-0.01em' }}>
               Invoices
             </span>
             <span style={{
-              fontSize: '11.5px', fontWeight: 600, color: '#64748b',
-              background: '#f1f5f9', padding: '3px 10px', borderRadius: '20px',
+              fontSize: '11px', fontWeight: 600, color: '#9ca3af',
+              background: '#f0f2f8', padding: '3px 10px', borderRadius: '20px',
+              border: '1px solid #e4e7ef',
             }}>
               {invoicesQuery.isLoading ? '…' : `${filtered.length} of ${total}`}
             </span>
@@ -1010,13 +1020,13 @@ export default function SalesPage() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '820px' }}>
               <thead>
-                <tr style={{ background: '#f8fafc' }}>
+                <tr style={{ background: '#f8f9fc' }}>
                   {['Ref No', 'Date', 'Party Name', 'Items', 'Total Amount', 'Paid', 'Due', 'Status', 'Actions'].map(h => (
                     <th key={h} style={{
-                      padding: '11px 16px', fontSize: '11px', fontWeight: 700, color: '#94a3b8',
+                      padding: '11px 16px', fontSize: '11px', fontWeight: 600, color: '#9ca3af',
                       textAlign: h === 'Actions' || h === 'Items' ? 'center' : 'left',
                       textTransform: 'uppercase', letterSpacing: '0.05em',
-                      borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap',
+                      borderBottom: '1px solid #e4e7ef', whiteSpace: 'nowrap',
                     }}>
                       {h}
                     </th>
@@ -1037,8 +1047,8 @@ export default function SalesPage() {
                         }}>
                           <FileText size={22} color="#3b82f6" />
                         </div>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>No invoices found</div>
-                        <div style={{ fontSize: '13px', color: '#94a3b8' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#1a2235' }}>No invoices found</div>
+                        <div style={{ fontSize: '13px', color: '#9ca3af' }}>
                           {search || statusFilter ? 'Try adjusting your filters' : 'Create your first invoice'}
                         </div>
                       </div>
@@ -1060,36 +1070,36 @@ export default function SalesPage() {
                       >
                         <td style={{ padding: '14px 16px' }}>
                           <span style={{
-                            fontSize: '13px', fontWeight: 700, color: '#4f46e5',
+                            fontSize: '13px', fontWeight: 700, color: '#4646b5',
                             fontVariantNumeric: 'tabular-nums',
                           }}>
                             {inv.referenceNo}
                           </span>
                         </td>
-                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#475569', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#4b5563', whiteSpace: 'nowrap' }}>
                           {new Date(inv.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </td>
                         <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontSize: '13.5px', fontWeight: 600, color: '#1e293b' }}>{inv.party.name}</div>
+                          <div style={{ fontSize: '13.5px', fontWeight: 600, color: '#1a2235' }}>{inv.party.name}</div>
                           {inv.party.phone && (
-                            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px' }}>{inv.party.phone}</div>
+                            <div style={{ fontSize: '11.5px', color: '#9ca3af', marginTop: '2px' }}>{inv.party.phone}</div>
                           )}
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                           <span style={{
-                            fontSize: '12px', fontWeight: 700, color: '#64748b',
-                            background: '#f1f5f9', borderRadius: '20px', padding: '3px 10px',
+                            fontSize: '12px', fontWeight: 700, color: '#4b5563',
+                            background: '#f5f6fa', borderRadius: '20px', padding: '3px 10px',
                           }}>
                             {inv.items?.length ?? '–'}
                           </span>
                         </td>
-                        <td style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13.5px', fontWeight: 700, color: '#111827', whiteSpace: 'nowrap' }}>
                           {fmt(inv.totalAmount)}
                         </td>
                         <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
                           {fmt(inv.paidAmount)}
                         </td>
-                        <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 600, color: due > 0 ? '#dc2626' : '#64748b', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 600, color: due > 0 ? '#dc2626' : '#4b5563', whiteSpace: 'nowrap' }}>
                           {due > 0 ? fmt(due) : '—'}
                         </td>
                         <td style={{ padding: '14px 16px' }}>
@@ -1116,8 +1126,8 @@ export default function SalesPage() {
                               className="action-btn"
                               title="View / Edit"
                               style={{
-                                padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #e2e8f0',
-                                background: '#f8fafc', color: '#64748b', cursor: 'pointer', opacity: 0.9,
+                                padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #e4e7ef',
+                                background: '#f8f9fc', color: '#4b5563', cursor: 'pointer', opacity: 0.9,
                                 display: 'flex', alignItems: 'center',
                               }}
                             >

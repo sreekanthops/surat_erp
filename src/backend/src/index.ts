@@ -18,7 +18,7 @@ import { messagesRouter } from './api/messages.js';
 import { leadsRouter } from './api/leads.js';
 import { aiRouter } from './api/ai.js';
 import { reportsRouter } from './api/reports.js';
-import { integrationsRouter } from './api/integrations.js';
+import { integrationsRouter, gmailCallbackRouter } from './api/integrations.js';
 import { whatsappWebhookRouter } from './integrations/whatsapp/webhook.js';
 import { gmailWebhookRouter } from './integrations/gmail/webhook.js';
 import { razorpayWebhookRouter } from './integrations/razorpay/webhook.js';
@@ -73,6 +73,9 @@ app.use('/webhooks/razorpay', razorpayWebhookRouter);
 
 // ── Auth Routes (no auth middleware) ──────────────────────
 app.use('/api/v1/auth', authRouter);
+
+// ── Gmail OAuth callback (no auth — Google redirects here without JWT) ────────
+app.use('/api/v1/integrations/gmail/callback', gmailCallbackRouter);
 
 // ── Protected Routes ──────────────────────────────────────
 app.use('/api/v1', authMiddleware, tenantMiddleware);

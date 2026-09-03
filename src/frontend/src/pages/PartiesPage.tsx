@@ -58,16 +58,16 @@ const fmt = (n: number) =>
 const SkeletonRow = () => (
   <tr>
     {[200, 80, 110, 100, 120, 110, 90].map((w, i) => (
-      <td key={i} style={{ padding: '14px 16px' }}>
+      <td key={i} style={{ padding: '12px 16px' }}>
         <div
           style={{
-            height: '14px',
+            height: '13px',
             width: `${w}px`,
             maxWidth: '100%',
-            background: 'linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%)',
+            background: 'linear-gradient(90deg, #f0f2f8 25%, #e8eaf2 50%, #f0f2f8 75%)',
             backgroundSize: '400% 100%',
             borderRadius: '6px',
-            animation: 'shimmer 1.4s ease-in-out infinite',
+            animation: 'skeleton-shimmer 1.5s ease infinite',
           }}
         />
       </td>
@@ -79,14 +79,14 @@ const SkeletonSummaryCard = () => (
   <div
     style={{
       background: '#fff',
-      borderRadius: '16px',
-      padding: '22px',
-      boxShadow: '0 2px 16px rgba(15,23,42,0.06)',
-      border: '1px solid rgba(226,232,240,0.8)',
+      borderRadius: '14px',
+      padding: '18px 20px',
+      boxShadow: '0 2px 8px rgba(17,24,39,0.05)',
+      border: '1px solid #e4e7ef',
     }}
   >
-    <div style={{ height: '12px', width: '80px', background: '#e2e8f0', borderRadius: '6px', marginBottom: '12px' }} />
-    <div style={{ height: '28px', width: '120px', background: '#e2e8f0', borderRadius: '6px' }} />
+    <div style={{ height: '11px', width: '75px', background: '#f0f2f8', borderRadius: '5px', marginBottom: '12px' }} />
+    <div style={{ height: '24px', width: '110px', background: '#e8eaf2', borderRadius: '6px' }} />
   </div>
 );
 
@@ -101,23 +101,23 @@ interface SummaryCardProps {
   valueColor?: string;
 }
 
-const SummaryCard = ({ title, value, icon: Icon, iconBg, iconColor, valueColor = '#0f172a' }: SummaryCardProps) => (
+const SummaryCard = ({ title, value, icon: Icon, iconBg, iconColor, valueColor = '#111827' }: SummaryCardProps) => (
   <div
     style={{
       background: '#fff',
-      borderRadius: '16px',
-      padding: '22px',
-      boxShadow: '0 2px 16px rgba(15,23,42,0.06)',
-      border: '1px solid rgba(226,232,240,0.8)',
+      borderRadius: '14px',
+      padding: '18px 20px',
+      boxShadow: '0 2px 8px rgba(17,24,39,0.05)',
+      border: '1px solid #e4e7ef',
       display: 'flex',
       alignItems: 'flex-start',
-      gap: '16px',
+      gap: '14px',
     }}
   >
     <div
       style={{
-        width: '44px',
-        height: '44px',
+        width: '42px',
+        height: '42px',
         borderRadius: '12px',
         background: iconBg,
         display: 'flex',
@@ -126,13 +126,13 @@ const SummaryCard = ({ title, value, icon: Icon, iconBg, iconColor, valueColor =
         flexShrink: 0,
       }}
     >
-      <Icon size={20} color={iconColor} />
+      <Icon size={19} color={iconColor} />
     </div>
     <div>
-      <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' }}>
         {title}
       </div>
-      <div style={{ fontSize: '22px', fontWeight: 800, color: valueColor, lineHeight: 1 }}>
+      <div style={{ fontSize: '22px', fontWeight: 800, color: valueColor, lineHeight: 1, letterSpacing: '-0.03em' }}>
         {value}
       </div>
     </div>
@@ -176,7 +176,7 @@ interface FieldProps {
 
 const Field = ({ label, children, half }: FieldProps) => (
   <div style={{ gridColumn: half ? 'span 1' : 'span 2' }}>
-    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px', letterSpacing: '0.04em' }}>
+    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#4b5563', marginBottom: '5px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
       {label}
     </label>
     {children}
@@ -185,17 +185,17 @@ const Field = ({ label, children, half }: FieldProps) => (
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  height: '40px',
+  height: '38px',
   padding: '0 12px',
   borderRadius: '10px',
-  border: '1.5px solid #e2e8f0',
-  fontSize: '14px',
-  color: '#1e293b',
-  background: '#f8fafc',
+  border: '1.5px solid #e4e7ef',
+  fontSize: '13.5px',
+  color: '#111827',
+  background: '#f8f9fc',
   outline: 'none',
   boxSizing: 'border-box',
-  transition: 'border-color 0.15s',
-  fontFamily: 'Inter, sans-serif',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+  fontFamily: "Inter, -apple-system, sans-serif",
 };
 
 const textareaStyle: React.CSSProperties = {
@@ -253,7 +253,7 @@ const PartyModal = ({ open, onClose, initial, onSave, saving }: PartyModalProps)
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
+        position: 'fixed', inset: 0, background: 'rgba(8,9,20,0.45)',
         backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1000, padding: '24px',
@@ -275,15 +275,15 @@ const PartyModal = ({ open, onClose, initial, onSave, saving }: PartyModalProps)
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '20px 24px',
-          borderBottom: '1px solid #f1f5f9',
+          borderBottom: '1px solid #f5f6fa',
           position: 'sticky', top: 0, background: '#fff', zIndex: 1,
           borderRadius: '20px 20px 0 0',
         }}>
           <div>
-            <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+            <div style={{ fontSize: '17px', fontWeight: 800, color: '#111827' }}>
               {initial ? 'Edit Party' : 'Add New Party'}
             </div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
               {initial ? 'Update party details' : 'Fill in the party information'}
             </div>
           </div>
@@ -291,11 +291,11 @@ const PartyModal = ({ open, onClose, initial, onSave, saving }: PartyModalProps)
             onClick={onClose}
             style={{
               width: '32px', height: '32px', borderRadius: '8px',
-              border: 'none', background: '#f1f5f9',
+              border: 'none', background: '#f5f6fa',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <X size={16} color="#64748b" />
+            <X size={16} color="#4b5563" />
           </button>
         </div>
 
@@ -324,7 +324,7 @@ const PartyModal = ({ open, onClose, initial, onSave, saving }: PartyModalProps)
                   <option value="SUPPLIER">Supplier</option>
                   <option value="BOTH">Both</option>
                 </select>
-                <ChevronDown size={14} color="#94a3b8" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <ChevronDown size={14} color="#9ca3af" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               </div>
             </Field>
 
@@ -417,14 +417,14 @@ const PartyModal = ({ open, onClose, initial, onSave, saving }: PartyModalProps)
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #f5f6fa' }}>
             <button
               type="button"
               onClick={onClose}
               style={{
                 height: '40px', padding: '0 20px', borderRadius: '10px',
-                border: '1.5px solid #e2e8f0', background: '#fff',
-                fontSize: '14px', fontWeight: 600, color: '#64748b',
+                border: '1.5px solid #e4e7ef', background: '#fff',
+                fontSize: '14px', fontWeight: 600, color: '#4b5563',
                 cursor: 'pointer',
               }}
             >
@@ -436,7 +436,7 @@ const PartyModal = ({ open, onClose, initial, onSave, saving }: PartyModalProps)
               style={{
                 height: '40px', padding: '0 24px', borderRadius: '10px',
                 border: 'none',
-                background: saving ? '#a5b4fc' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                background: saving ? '#a5b4fc' : 'linear-gradient(135deg, #5b5bd6 0%, #4646b5 100%)',
                 fontSize: '14px', fontWeight: 700, color: '#fff',
                 cursor: saving ? 'not-allowed' : 'pointer',
                 boxShadow: saving ? 'none' : '0 4px 12px rgba(99,102,241,0.35)',
@@ -492,19 +492,19 @@ const DeleteModal = ({ party, onClose, onConfirm, deleting }: DeleteModalProps) 
         }}>
           <Trash2 size={22} color="#ef4444" />
         </div>
-        <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+        <div style={{ fontSize: '18px', fontWeight: 800, color: '#111827', marginBottom: '8px' }}>
           Delete Party?
         </div>
-        <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '28px', lineHeight: 1.6 }}>
-          Are you sure you want to delete <strong style={{ color: '#1e293b' }}>{party.name}</strong>? This action cannot be undone.
+        <div style={{ fontSize: '14px', color: '#4b5563', marginBottom: '28px', lineHeight: 1.6 }}>
+          Are you sure you want to delete <strong style={{ color: '#1a2235' }}>{party.name}</strong>? This action cannot be undone.
         </div>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <button
             onClick={onClose}
             style={{
               height: '40px', padding: '0 20px', borderRadius: '10px',
-              border: '1.5px solid #e2e8f0', background: '#fff',
-              fontSize: '14px', fontWeight: 600, color: '#64748b',
+              border: '1.5px solid #e4e7ef', background: '#fff',
+              fontSize: '14px', fontWeight: 600, color: '#4b5563',
               cursor: 'pointer',
             }}
           >
@@ -619,7 +619,7 @@ export default function PartiesPage() {
           100% { background-position: -200% 0; }
         }
         input:focus, textarea:focus, select:focus {
-          border-color: #6366f1 !important;
+          border-color: #5b5bd6 !important;
           background: #fff !important;
           box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
         }
@@ -630,15 +630,15 @@ export default function PartiesPage() {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px', gap: '16px', flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#111827', margin: 0, lineHeight: 1.2 }}>
             Parties
           </h1>
-          <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+          <p style={{ fontSize: '13px', color: '#4b5563', marginTop: '4px' }}>
             Customers &amp; Suppliers
           </p>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: '4px', marginTop: '16px', background: '#f1f5f9', borderRadius: '10px', padding: '4px', width: 'fit-content' }}>
+          <div style={{ display: 'flex', gap: '4px', marginTop: '16px', background: '#f5f6fa', borderRadius: '10px', padding: '4px', width: 'fit-content' }}>
             {tabs.map((t) => (
               <button
                 key={t}
@@ -653,7 +653,7 @@ export default function PartiesPage() {
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                   background: tab === t ? '#fff' : 'transparent',
-                  color: tab === t ? '#4f46e5' : '#64748b',
+                  color: tab === t ? '#4646b5' : '#4b5563',
                   boxShadow: tab === t ? '0 1px 4px rgba(15,23,42,0.1)' : 'none',
                 }}
               >
@@ -670,7 +670,7 @@ export default function PartiesPage() {
             padding: '0 20px',
             borderRadius: '12px',
             border: 'none',
-            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+            background: 'linear-gradient(135deg, #5b5bd6 0%, #4646b5 100%)',
             color: '#fff',
             fontSize: '14px',
             fontWeight: 700,
@@ -747,14 +747,14 @@ export default function PartiesPage() {
         {/* Toolbar */}
         <div style={{
           padding: '16px 20px',
-          borderBottom: '1px solid #f1f5f9',
+          borderBottom: '1px solid #f5f6fa',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
           background: '#fafbff',
         }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: '360px' }}>
-            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={15} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -763,12 +763,12 @@ export default function PartiesPage() {
                 ...inputStyle,
                 paddingLeft: '36px',
                 background: '#fff',
-                border: '1.5px solid #e2e8f0',
+                border: '1.5px solid #e4e7ef',
               }}
             />
           </div>
           {!isLoading && (
-            <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '12px', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
               {parties.length} {parties.length === 1 ? 'party' : 'parties'}
             </span>
           )}
@@ -778,7 +778,7 @@ export default function PartiesPage() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
+              <tr style={{ background: '#f8f9fc' }}>
                 {['Name', 'Type', 'Phone', 'City', 'Credit Limit', 'Balance', 'Actions'].map((col) => (
                   <th
                     key={col}
@@ -787,10 +787,10 @@ export default function PartiesPage() {
                       textAlign: col === 'Actions' ? 'right' : 'left',
                       fontSize: '11px',
                       fontWeight: 700,
-                      color: '#64748b',
+                      color: '#4b5563',
                       textTransform: 'uppercase',
                       letterSpacing: '0.06em',
-                      borderBottom: '1px solid #f1f5f9',
+                      borderBottom: '1px solid #f5f6fa',
                       whiteSpace: 'nowrap',
                     }}
                   >
@@ -808,13 +808,13 @@ export default function PartiesPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                       <div style={{
                         width: '48px', height: '48px', borderRadius: '14px',
-                        background: '#f1f5f9',
+                        background: '#f5f6fa',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
-                        <Users size={22} color="#94a3b8" />
+                        <Users size={22} color="#9ca3af" />
                       </div>
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>No parties found</div>
-                      <div style={{ fontSize: '13px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#4b5563' }}>No parties found</div>
+                      <div style={{ fontSize: '13px', color: '#9ca3af' }}>
                         {search ? `No results for "${search}"` : 'Add your first party to get started'}
                       </div>
                     </div>
@@ -826,7 +826,7 @@ export default function PartiesPage() {
                   const balColor =
                     bal > 0 ? '#ef4444' :
                     bal < 0 ? '#16a34a' :
-                    '#94a3b8';
+                    '#9ca3af';
 
                   return (
                     <tr
@@ -840,9 +840,9 @@ export default function PartiesPage() {
                     >
                       {/* Name */}
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: 700, color: '#1e293b' }}>{party.name}</div>
+                        <div style={{ fontWeight: 700, color: '#1a2235' }}>{party.name}</div>
                         {party.email && (
-                          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{party.email}</div>
+                          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>{party.email}</div>
                         )}
                       </td>
 
@@ -852,18 +852,18 @@ export default function PartiesPage() {
                       </td>
 
                       {/* Phone */}
-                      <td style={{ padding: '14px 16px', color: '#475569' }}>
-                        {party.phone || <span style={{ color: '#cbd5e1' }}>—</span>}
+                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>
+                        {party.phone || <span style={{ color: '#d1d5db' }}>—</span>}
                       </td>
 
                       {/* City */}
-                      <td style={{ padding: '14px 16px', color: '#475569' }}>
-                        {party.city || <span style={{ color: '#cbd5e1' }}>—</span>}
+                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>
+                        {party.city || <span style={{ color: '#d1d5db' }}>—</span>}
                       </td>
 
                       {/* Credit Limit */}
-                      <td style={{ padding: '14px 16px', color: '#475569', fontVariantNumeric: 'tabular-nums' }}>
-                        {Number(party.creditLimit) > 0 ? fmt(Number(party.creditLimit)) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      <td style={{ padding: '14px 16px', color: '#4b5563', fontVariantNumeric: 'tabular-nums' }}>
+                        {Number(party.creditLimit) > 0 ? fmt(Number(party.creditLimit)) : <span style={{ color: '#d1d5db' }}>—</span>}
                       </td>
 
                       {/* Balance */}
@@ -887,12 +887,12 @@ export default function PartiesPage() {
                             title="Edit"
                             style={{
                               width: '32px', height: '32px', borderRadius: '8px',
-                              border: '1.5px solid #e2e8f0', background: '#fff',
+                              border: '1.5px solid #e4e7ef', background: '#fff',
                               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                               transition: 'all 0.15s',
                             }}
                           >
-                            <Edit2 size={14} color="#4f46e5" />
+                            <Edit2 size={14} color="#4646b5" />
                           </button>
                           <button
                             className="action-btn"

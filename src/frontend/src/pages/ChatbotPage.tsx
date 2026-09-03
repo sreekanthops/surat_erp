@@ -44,7 +44,7 @@ const suggestions = [
 ];
 
 // ── Chart colours ────────────────────────────────────────────────────────────
-const CHAT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
+const CHAT_COLORS = ['#5b5bd6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
 const fmtK = (n: number) =>
   n >= 1_00_00_000 ? `₹${(n/1_00_00_000).toFixed(1)}Cr`
   : n >= 1_00_000 ? `₹${(n/1_00_000).toFixed(1)}L`
@@ -73,7 +73,7 @@ function renderMarkdown(text: string): React.ReactNode {
         parts.push(
           <strong key={`b${m.index}`} style={{
             fontWeight: 700,
-            color: isHeader ? '#6366f1' : '#0f172a',
+            color: isHeader ? '#5b5bd6' : '#111827',
             letterSpacing: isHeader ? '0.01em' : undefined,
           }}>
             {m[1]}
@@ -127,9 +127,9 @@ function renderMarkdown(text: string): React.ReactNode {
         }}>
           <span style={{
             width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 5,
-            background: hasStat ? '#6366f1' : '#94a3b8',
+            background: hasStat ? '#5b5bd6' : '#9ca3af',
           }} />
-          <span style={{ fontSize: 13.5, lineHeight: 1.55, color: '#1e293b' }}>
+          <span style={{ fontSize: 13.5, lineHeight: 1.55, color: '#1a2235' }}>
             {renderInline(content)}
           </span>
         </div>
@@ -143,15 +143,15 @@ function renderMarkdown(text: string): React.ReactNode {
       nodes.push(
         <div key={k} style={{
           display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4,
-          background: '#f8fafc', borderRadius: 9, padding: '6px 10px',
-          border: '1px solid #f1f5f9',
+          background: '#f8f9fc', borderRadius: 9, padding: '6px 10px',
+          border: '1px solid #f5f6fa',
         }}>
           <span style={{
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-            background: '#6366f1', color: '#fff',
+            background: '#5b5bd6', color: '#fff',
             fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>{numMatch[1]}</span>
-          <span style={{ fontSize: 13.5, lineHeight: 1.55, color: '#1e293b' }}>
+          <span style={{ fontSize: 13.5, lineHeight: 1.55, color: '#1a2235' }}>
             {renderInline(numMatch[2])}
           </span>
         </div>
@@ -161,7 +161,7 @@ function renderMarkdown(text: string): React.ReactNode {
 
     // Section divider (---)
     if (/^---+$/.test(trimmed)) {
-      nodes.push(<hr key={k} style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />);
+      nodes.push(<hr key={k} style={{ border: 'none', borderTop: '1px solid #e4e7ef', margin: '8px 0' }} />);
       continue;
     }
 
@@ -183,7 +183,7 @@ function renderMarkdown(text: string): React.ReactNode {
 
     // Default paragraph text
     nodes.push(
-      <p key={k} style={{ margin: '2px 0', fontSize: 13.5, lineHeight: 1.6, color: '#1e293b' }}>
+      <p key={k} style={{ margin: '2px 0', fontSize: 13.5, lineHeight: 1.6, color: '#1a2235' }}>
         {renderInline(trimmed)}
       </p>
     );
@@ -226,7 +226,7 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
             {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
           </Pie>
           <Tooltip formatter={(v: any) => fmtK(Number(v))} />
-          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#4b5563' }}>{v}</span>} />
         </PieChart>
       );
     }
@@ -234,9 +234,9 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
     if (chart.type === 'horizontal_bar') {
       return (
         <BarChart data={chart.data} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }} barCategoryGap="28%">
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-          <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} width={90} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f5f6fa" horizontal={false} />
+          <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#4b5563' }} tickLine={false} axisLine={false} width={90} />
           <Tooltip formatter={(v: any) => fmtK(Number(v))} />
           <Bar dataKey="value" radius={[0,4,4,0]}>
             {chart.data.map((_: any, i: number) => <Cell key={i} fill={CHAT_COLORS[i % CHAT_COLORS.length]} />)}
@@ -256,11 +256,11 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
               </linearGradient>
             ))}
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f5f6fa" />
+          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={44} />
           <Tooltip formatter={(v: any) => fmtK(Number(v))} />
-          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#4b5563' }}>{v}</span>} />
           {dataKeys.map((k, i) => (
             <Area key={k} type="monotone" dataKey={k} name={k} stroke={CHAT_COLORS[i]} fill={`url(#areaGrad${i})`} strokeWidth={2} dot={{ r: 3 }} />
           ))}
@@ -272,11 +272,11 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
       const [k1, k2, ...rest] = dataKeys;
       return (
         <ComposedChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f5f6fa" />
+          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={44} />
           <Tooltip formatter={(v: any) => fmtK(Number(v))} />
-          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#4b5563' }}>{v}</span>} />
           {k1 && <Bar dataKey={k1} name={k1} fill={CHAT_COLORS[0]} radius={[4,4,0,0]} />}
           {k2 && <Line type="monotone" dataKey={k2} name={k2} stroke={CHAT_COLORS[1]} strokeWidth={2} dot={{ r: 3 }} />}
           {rest.map((k, i) => <Line key={k} type="monotone" dataKey={k} name={k} stroke={CHAT_COLORS[i+2]} strokeWidth={2} dot={{ r: 3 }} />)}
@@ -287,11 +287,11 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
     if (chart.type === 'line') {
       return (
         <LineChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f5f6fa" />
+          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={44} />
           <Tooltip formatter={(v: any) => fmtK(Number(v))} />
-          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+          <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#4b5563' }}>{v}</span>} />
           {dataKeys.map((k, i) => (
             <Line key={k} type="monotone" dataKey={k} name={k} stroke={CHAT_COLORS[i]} strokeWidth={2} dot={{ r: 3 }} />
           ))}
@@ -302,13 +302,13 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
     // Default: bar
     return (
       <BarChart data={chart.data} margin={{ top: 5, right: 8, left: 0, bottom: 0 }} barCategoryGap="35%">
-        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-        <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-        <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={44} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#f5f6fa" />
+        <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+        <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={44} />
         <Tooltip formatter={(v: any) => fmtK(Number(v))} />
         {dataKeys.length > 1 ? (
           <>
-            <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#475569' }}>{v}</span>} />
+            <Legend iconType="circle" iconSize={7} formatter={(v: string) => <span style={{ fontSize: 10, color: '#4b5563' }}>{v}</span>} />
             {dataKeys.map((k, i) => <Bar key={k} dataKey={k} name={k} fill={CHAT_COLORS[i]} radius={[4,4,0,0]} />)}
           </>
         ) : (
@@ -331,12 +331,12 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{
             width: 26, height: 26, borderRadius: 7,
-            background: 'linear-gradient(135deg,#6366f1,#818cf8)',
+            background: 'linear-gradient(135deg,#5b5bd6,#818cf8)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <BarChart2 size={13} color="#fff" />
           </div>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', letterSpacing: '0.01em' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#111827', letterSpacing: '0.01em' }}>
             {chart.title}
           </span>
         </div>
@@ -347,7 +347,7 @@ function ChatInlineChart({ chart }: { chart: ChartData }) {
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '4px 10px', borderRadius: 7,
               border: '1px solid #c7d2fe', background: '#eef2ff',
-              fontSize: 11, color: '#6366f1', fontWeight: 600, cursor: 'pointer',
+              fontSize: 11, color: '#5b5bd6', fontWeight: 600, cursor: 'pointer',
             }}
           >
             <Download size={11} /> Export
@@ -388,8 +388,8 @@ const WA_ICON = () => (
 );
 
 // ── Score colour helpers ───────────────────────────────────────────────────────
-const scoreColor = (s: number) => s >= 70 ? '#16a34a' : s >= 50 ? '#f97316' : '#64748b';
-const scoreBg    = (s: number) => s >= 70 ? '#f0fdf4' : s >= 50 ? '#fff7ed' : '#f8fafc';
+const scoreColor = (s: number) => s >= 70 ? '#16a34a' : s >= 50 ? '#f97316' : '#4b5563';
+const scoreBg    = (s: number) => s >= 70 ? '#f0fdf4' : s >= 50 ? '#fff7ed' : '#f8f9fc';
 const intentLabel: Record<string, string> = {
   quote_request: 'Quote Request', order_confirm: 'Order Confirm',
   bulk_inquiry: 'Bulk Inquiry', catalogue_request: 'Catalogue',
@@ -408,8 +408,8 @@ function LeadCardBlock({ card, onConvert }: { card: LeadCard; onConvert: (card: 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ color: '#16a34a' }}><WA_ICON /></span>
-          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 13 }}>{card.name}</span>
-          <span style={{ fontSize: 11, color: '#64748b' }}>{card.phone}</span>
+          <span style={{ fontWeight: 700, color: '#1a2235', fontSize: 13 }}>{card.name}</span>
+          <span style={{ fontSize: 11, color: '#4b5563' }}>{card.phone}</span>
         </div>
         <div style={{
           background: scoreBg(card.score), border: `1px solid ${scoreColor(card.score)}44`,
@@ -440,7 +440,7 @@ function LeadCardBlock({ card, onConvert }: { card: LeadCard; onConvert: (card: 
         <button
           onClick={() => onConvert(card)}
           style={{
-            padding: '4px 10px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+            padding: '4px 10px', background: 'linear-gradient(135deg,#5b5bd6,#8b5cf6)',
             border: 'none', borderRadius: 7, color: '#fff', fontSize: 11, fontWeight: 700,
             cursor: 'pointer', flexShrink: 0,
           }}
@@ -481,8 +481,8 @@ function ConvertLeadModal({ card, onClose, onSuccess }: { card: LeadCard; onClos
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: '#fff', borderRadius: 18, padding: 28, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', margin: '0 0 4px' }}>Convert to Lead</h2>
-        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 18px' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, color: '#1a2235', margin: '0 0 4px' }}>Convert to Lead</h2>
+        <p style={{ fontSize: 12, color: '#4b5563', margin: '0 0 18px' }}>
           <strong>{card.name}</strong> · {card.phone} via WhatsApp
         </p>
         {[
@@ -493,14 +493,14 @@ function ConvertLeadModal({ card, onClose, onSuccess }: { card: LeadCard; onClos
           <div key={f.label} style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>
             <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-              style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 9, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e4e7ef', borderRadius: 9, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
           </div>
         ))}
         {mut.isError && <p style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>Could not find message in inbox — go to Inbox tab first.</p>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', border: '1.5px solid #e2e8f0', borderRadius: 9, background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={onClose} style={{ padding: '8px 16px', border: '1.5px solid #e4e7ef', borderRadius: 9, background: '#fff', color: '#4b5563', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
           <button onClick={() => mut.mutate()} disabled={mut.isPending}
-            style={{ padding: '8px 16px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: 9, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'linear-gradient(135deg,#5b5bd6,#8b5cf6)', border: 'none', borderRadius: 9, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
             {mut.isPending ? 'Creating...' : '🎯 Create Lead'}
           </button>
         </div>
@@ -627,7 +627,7 @@ export default function ChatbotPage() {
               {/* ── WhatsApp Lead Cards ── */}
               {msg.role === 'assistant' && msg.leadCards && msg.leadCards.length > 0 && (
                 <div style={{ marginTop: 4 }}>
-                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 4, paddingLeft: 2 }}>
+                  <div style={{ fontSize: 11, color: '#4b5563', fontWeight: 600, marginBottom: 4, paddingLeft: 2 }}>
                     📱 {msg.leadCards.length} WhatsApp Lead{msg.leadCards.length > 1 ? 's' : ''} Detected
                   </div>
                   {msg.leadCards.map((card, ci) => (

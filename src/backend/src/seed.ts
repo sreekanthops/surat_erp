@@ -18,7 +18,7 @@ async function main() {
   // ── Tenant ────────────────────────────────────────────────────────────────
   const tenant = await prisma.tenant.upsert({
     where:  { id: TENANT_ID },
-    update: {},
+    update: { name: 'GSpaces TextileIQ' },
     create: {
       id: TENANT_ID, name: 'GSpaces TextileIQ', gstin: '24AABCS1429B1ZB',
       address: 'Ring Road, Surat', city: 'Surat', state: 'Gujarat',

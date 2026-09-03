@@ -30,6 +30,7 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
     leads,
     recentMessages,
     whatsappSignals,
+    gmailMessages,
   ] = await Promise.all([
     prisma.transaction.aggregate({
       where: { tenantId, type: 'SALE', date: { gte: today, lte: todayEnd } },
@@ -79,6 +80,18 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
       include: { party: true },
       orderBy: { createdAt: 'desc' },
       take: 30,
+    }),
+    // Recent Gmail messages
+    prisma.message.findMany({
+      where: {
+        tenantId,
+        channel: 'GMAIL',
+        direction: 'INBOUND',
+        createdAt: { gte: new Date(Date.now() - 7 * 86400000) },
+      },
+      include: { party: true },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
     }),
   ]);
 
@@ -153,6 +166,10 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
      Message: "${s.messages[0] || ''}"`;
   }).join('\n');
 
+  const gmailLines = gmailMessages.map((m) =>
+    `  • From: ${m.party?.name || m.fromAddress} | Subject: ${m.subject || '(no subject)'} | "${(m.content || '').slice(0, 100)}" | Read: ${m.isRead ? 'yes' : 'NO'} | ${new Date(m.createdAt).toLocaleDateString('en-IN')}`
+  ).join('\n');
+
   return `=== LIVE BUSINESS DATA for GSpaces TextileIQ (as of ${todayDateStr}) ===
 
 TODAY'S SALES:
@@ -179,6 +196,9 @@ ${msgLines || '  None'}
 WHATSAPP POTENTIAL CUSTOMERS — ${waSenders.length} people messaged with buying signals (last 30 days):
 ${waLeadLines || '  None detected'}
 
+GMAIL INBOX (last 7 days — ${gmailMessages.length} emails):
+${gmailLines || '  No emails synced yet. User can sync via Gmail page.'}
+
 === END LIVE DATA ===`;
 }
 
@@ -199,6 +219,12 @@ Instructions:
 - Be concise and direct — the owner is busy
 - For pending payments, list party names and amounts
 - For stock questions, give exact quantities and flag LOW STOCK items
+
+GMAIL RULES:
+- When asked about emails, look at the GMAIL INBOX section
+- Summarise unread emails, mention sender names, subjects, and any business-relevant content
+- If someone asks "koi email aaya?" or "any new emails?" — list the unread ones
+- If no emails synced, tell user to go to the Gmail page and click Sync
 
 WHATSAPP LEAD DETECTION RULES:
 - When asked about WhatsApp leads or potential customers, look at the "WHATSAPP POTENTIAL CUSTOMERS" section

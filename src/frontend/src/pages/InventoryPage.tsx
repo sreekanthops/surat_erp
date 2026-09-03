@@ -56,42 +56,44 @@ const UNITS = ['METER', 'KG', 'PIECE', 'BUNDLE', 'BOX', 'ROLL'];
 
 const S = {
   page: {
-    padding: '32px',
-    maxWidth: '1200px',
-    fontFamily: 'Inter, sans-serif',
-    background: '#f1f5f9',
+    padding: '28px 32px',
+    fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif",
+    background: '#f5f6fa',
     minHeight: '100vh',
   } as React.CSSProperties,
 
   header: {
     display: 'flex',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: '28px',
+    marginBottom: '24px',
+    gap: '16px',
   } as React.CSSProperties,
 
   h1: {
-    fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.2,
+    fontSize: '20px', fontWeight: 800, color: '#111827', margin: 0, lineHeight: 1.2, letterSpacing: '-0.03em',
   } as React.CSSProperties,
 
   sub: {
-    fontSize: '13px', color: '#64748b', marginTop: '4px', margin: 0,
+    fontSize: '13px', color: '#9ca3af', marginTop: '3px', margin: 0,
   } as React.CSSProperties,
 
   primaryBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: '7px',
-    background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+    background: '#5b5bd6',
     color: '#fff',
     border: 'none',
     borderRadius: '10px',
     padding: '9px 18px',
     fontWeight: 600,
-    fontSize: '14px',
+    fontSize: '13.5px',
     cursor: 'pointer',
-    boxShadow: '0 4px 14px rgba(99,102,241,0.35)',
-    transition: 'opacity 0.15s',
+    boxShadow: '0 2px 8px rgba(91,91,214,0.35), inset 0 1px 0 rgba(255,255,255,0.12)',
+    transition: 'all 0.15s ease',
+    fontFamily: 'inherit',
+    letterSpacing: '-0.01em',
   } as React.CSSProperties,
 
   summaryGrid: {
@@ -103,17 +105,18 @@ const S = {
 
   statCard: {
     background: '#fff',
-    borderRadius: '16px',
-    boxShadow: '0 2px 16px rgba(15,23,42,0.06)',
-    padding: '20px',
+    borderRadius: '14px',
+    boxShadow: '0 2px 8px rgba(17,24,39,0.05)',
+    border: '1px solid #e4e7ef',
+    padding: '18px 20px',
     display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
+    alignItems: 'flex-start',
+    gap: '14px',
   } as React.CSSProperties,
 
   statIconBox: (bg: string): React.CSSProperties => ({
-    width: '44px',
-    height: '44px',
+    width: '42px',
+    height: '42px',
     borderRadius: '12px',
     background: bg,
     display: 'flex',
@@ -124,18 +127,19 @@ const S = {
 
   statLabel: {
     fontSize: '11px',
-    fontWeight: 700,
-    color: '#64748b',
+    fontWeight: 600,
+    color: '#9ca3af',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
-    marginBottom: '4px',
+    marginBottom: '5px',
   },
 
   statValue: {
     fontSize: '22px',
     fontWeight: 800,
-    color: '#0f172a',
+    color: '#111827',
     lineHeight: 1,
+    letterSpacing: '-0.03em',
   },
 
   toolbar: {
@@ -156,31 +160,31 @@ const S = {
     left: '12px',
     top: '50%',
     transform: 'translateY(-50%)',
-    color: '#94a3b8',
+    color: '#9ca3af',
     pointerEvents: 'none' as const,
   },
 
   searchInput: {
     width: '100%',
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid #e4e7ef',
     borderRadius: '10px',
     padding: '10px 14px 10px 38px',
     fontSize: '14px',
-    background: '#f8fafc',
+    background: '#f8f9fc',
     outline: 'none',
     boxSizing: 'border-box' as const,
-    color: '#1e293b',
+    color: '#1a2235',
     transition: 'border-color 0.15s',
   } as React.CSSProperties,
 
   select: {
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid #e4e7ef',
     borderRadius: '10px',
     padding: '10px 14px',
     fontSize: '14px',
-    background: '#f8fafc',
+    background: '#f8f9fc',
     outline: 'none',
-    color: '#1e293b',
+    color: '#1a2235',
     cursor: 'pointer',
     minWidth: '160px',
     transition: 'border-color 0.15s',
@@ -188,8 +192,9 @@ const S = {
 
   tableCard: {
     background: '#fff',
-    borderRadius: '16px',
-    boxShadow: '0 2px 16px rgba(15,23,42,0.06)',
+    borderRadius: '14px',
+    border: '1px solid #e4e7ef',
+    boxShadow: '0 2px 8px rgba(17,24,39,0.05)',
     overflow: 'hidden',
   } as React.CSSProperties,
 
@@ -200,31 +205,31 @@ const S = {
   } as React.CSSProperties,
 
   thead: {
-    background: '#f8fafc',
+    background: '#f8f9fc',
   } as React.CSSProperties,
 
   th: {
-    padding: '12px 16px',
+    padding: '11px 16px',
     fontSize: '11px',
-    fontWeight: 700,
-    color: '#64748b',
+    fontWeight: 600,
+    color: '#9ca3af',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
     textAlign: 'left' as const,
     whiteSpace: 'nowrap' as const,
-    borderBottom: '1px solid #e2e8f0',
+    borderBottom: '1px solid #e4e7ef',
   } as React.CSSProperties,
 
   td: {
-    padding: '13px 16px',
-    borderBottom: '1px solid #f1f5f9',
-    color: '#1e293b',
+    padding: '12px 16px',
+    borderBottom: '1px solid #eff0f6',
+    color: '#111827',
     verticalAlign: 'middle' as const,
   } as React.CSSProperties,
 
   skeletonRow: {
     height: '20px',
-    background: '#e2e8f0',
+    background: '#e4e7ef',
     borderRadius: '6px',
     animation: 'pulse 1.5s ease-in-out infinite',
   } as React.CSSProperties,
@@ -246,7 +251,8 @@ const S = {
   overlay: {
     position: 'fixed' as const,
     inset: 0,
-    background: 'rgba(0,0,0,0.4)',
+    background: 'rgba(8,9,20,0.45)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -257,22 +263,24 @@ const S = {
   modal: {
     background: '#fff',
     borderRadius: '20px',
-    padding: '32px',
+    padding: '28px 28px 24px',
     width: '520px',
     maxWidth: '100%',
     maxHeight: '90vh',
     overflowY: 'auto' as const,
-    boxShadow: '0 20px 60px rgba(15,23,42,0.2)',
+    boxShadow: '0 20px 60px rgba(17,24,39,0.14), 0 4px 16px rgba(17,24,39,0.06)',
+    border: '1px solid #e4e7ef',
   } as React.CSSProperties,
 
   modalTitle: {
-    fontSize: '17px',
-    fontWeight: 800,
-    color: '#0f172a',
-    marginBottom: '24px',
+    fontSize: '16px',
+    fontWeight: 700,
+    color: '#111827',
+    marginBottom: '22px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    letterSpacing: '-0.02em',
   } as React.CSSProperties,
 
   formGrid: {
@@ -297,19 +305,19 @@ const S = {
   label: {
     fontSize: '11px',
     fontWeight: 700,
-    color: '#64748b',
+    color: '#4b5563',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
   } as React.CSSProperties,
 
   input: {
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid #e4e7ef',
     borderRadius: '10px',
     padding: '10px 14px',
     fontSize: '14px',
-    background: '#f8fafc',
+    background: '#f8f9fc',
     outline: 'none',
-    color: '#1e293b',
+    color: '#1a2235',
     width: '100%',
     boxSizing: 'border-box' as const,
     transition: 'border-color 0.15s',
@@ -323,27 +331,30 @@ const S = {
   } as React.CSSProperties,
 
   cancelBtn: {
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid #e4e7ef',
     borderRadius: '10px',
-    padding: '9px 20px',
+    padding: '9px 18px',
     fontWeight: 600,
-    fontSize: '14px',
+    fontSize: '13.5px',
     cursor: 'pointer',
     background: '#fff',
-    color: '#64748b',
+    color: '#4b5563',
     transition: 'background 0.15s',
+    fontFamily: 'inherit',
   } as React.CSSProperties,
 
   dangerBtn: {
     border: 'none',
     borderRadius: '10px',
-    padding: '9px 20px',
+    padding: '9px 18px',
     fontWeight: 600,
-    fontSize: '14px',
+    fontSize: '13.5px',
     cursor: 'pointer',
-    background: 'linear-gradient(135deg,#ef4444,#dc2626)',
+    background: '#ef4444',
     color: '#fff',
-    transition: 'opacity 0.15s',
+    transition: 'all 0.15s',
+    boxShadow: '0 2px 8px rgba(239,68,68,0.3)',
+    fontFamily: 'inherit',
   } as React.CSSProperties,
 };
 
@@ -407,7 +418,7 @@ function StatCard({
       <div>
         <div style={S.statLabel}>{label}</div>
         {loading
-          ? <div style={{ width: '80px', height: '22px', background: '#e2e8f0', borderRadius: '6px', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          ? <div style={{ width: '80px', height: '22px', background: '#e4e7ef', borderRadius: '6px', animation: 'pulse 1.5s ease-in-out infinite' }} />
           : <div style={S.statValue}>{value}</div>
         }
       </div>
@@ -535,12 +546,12 @@ export default function InventoryPage() {
 
   const inputStyle = (name: string): React.CSSProperties => ({
     ...S.input,
-    borderColor: focusedField === name ? '#6366f1' : '#e2e8f0',
+    borderColor: focusedField === name ? '#5b5bd6' : '#e4e7ef',
   });
 
   const selectStyle = (name: string): React.CSSProperties => ({
     ...S.input,
-    borderColor: focusedField === name ? '#6366f1' : '#e2e8f0',
+    borderColor: focusedField === name ? '#5b5bd6' : '#e4e7ef',
     cursor: 'pointer',
   });
 
@@ -587,7 +598,7 @@ export default function InventoryPage() {
             value={summary.totalProducts ?? productsQuery.data?.total ?? 0}
             icon={Package}
             iconBg="#ede9fe"
-            iconColor="#6366f1"
+            iconColor="#5b5bd6"
             loading={summaryQuery.isLoading}
           />
           <StatCard
@@ -623,7 +634,7 @@ export default function InventoryPage() {
             <input
               style={{
                 ...S.searchInput,
-                borderColor: focusedField === 'search' ? '#6366f1' : '#e2e8f0',
+                borderColor: focusedField === 'search' ? '#5b5bd6' : '#e4e7ef',
               }}
               placeholder="Search products…"
               value={search}
@@ -634,7 +645,7 @@ export default function InventoryPage() {
           <select
             style={{
               ...S.select,
-              borderColor: focusedField === 'catFilter' ? '#6366f1' : '#e2e8f0',
+              borderColor: focusedField === 'catFilter' ? '#5b5bd6' : '#e4e7ef',
             }}
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -668,9 +679,9 @@ export default function InventoryPage() {
                 <SkeletonRows />
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ ...S.td, textAlign: 'center', padding: '48px', color: '#94a3b8', fontSize: '14px' }}>
+                  <td colSpan={9} style={{ ...S.td, textAlign: 'center', padding: '48px', color: '#9ca3af', fontSize: '14px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                      <Package size={32} color="#cbd5e1" />
+                      <Package size={32} color="#d1d5db" />
                       <span>No products found. Add your first product.</span>
                     </div>
                   </td>
@@ -699,7 +710,7 @@ export default function InventoryPage() {
               <span>{editProduct ? 'Edit Product' : 'Add Product'}</span>
               <button
                 onClick={closeModal}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px', display: 'flex' }}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex' }}
               >
                 <X size={20} />
               </button>
@@ -855,7 +866,7 @@ export default function InventoryPage() {
               <button
                 style={S.cancelBtn}
                 onClick={closeModal}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#f8f9fc')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
               >
                 Cancel
@@ -883,16 +894,16 @@ export default function InventoryPage() {
                 <Trash2 size={24} color="#ef4444" />
               </div>
             </div>
-            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', margin: '0 0 8px' }}>Delete Product</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px', lineHeight: 1.5 }}>
-              Are you sure you want to delete <strong style={{ color: '#1e293b' }}>{deleteTarget.name}</strong>?
+            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#111827', margin: '0 0 8px' }}>Delete Product</h3>
+            <p style={{ fontSize: '14px', color: '#4b5563', margin: '0 0 24px', lineHeight: 1.5 }}>
+              Are you sure you want to delete <strong style={{ color: '#1a2235' }}>{deleteTarget.name}</strong>?
               This action cannot be undone.
             </p>
             <div style={{ ...S.modalActions, justifyContent: 'center' }}>
               <button
                 style={S.cancelBtn}
                 onClick={() => setDeleteTarget(null)}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#f8f9fc')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
               >
                 Cancel
@@ -931,37 +942,37 @@ function ProductRow({
 
   return (
     <tr
-      style={{ background: hovered ? '#f8fafc' : '#fff', transition: 'background 0.12s' }}
+      style={{ background: hovered ? '#f8f9fc' : '#fff', transition: 'background 0.12s' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <td style={S.td}>
-        <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '13.5px' }}>{p.name}</div>
-        {p.code && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{p.code}</div>}
+        <div style={{ fontWeight: 600, color: '#1a2235', fontSize: '13.5px' }}>{p.name}</div>
+        {p.code && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{p.code}</div>}
       </td>
       <td style={S.td}>
-        <div style={{ fontSize: '13px', color: '#475569' }}>{p.category ?? '—'}</div>
-        {p.subcategory && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{p.subcategory}</div>}
+        <div style={{ fontSize: '13px', color: '#4b5563' }}>{p.category ?? '—'}</div>
+        {p.subcategory && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>{p.subcategory}</div>}
       </td>
       <td style={S.td}>
         <span style={{
           display: 'inline-block', padding: '2px 8px', borderRadius: '6px',
-          background: '#f1f5f9', color: '#475569', fontSize: '11px', fontWeight: 700,
+          background: '#f5f6fa', color: '#4b5563', fontSize: '11px', fontWeight: 700,
         }}>
           {p.unit}
         </span>
       </td>
-      <td style={{ ...S.td, fontWeight: 500, color: '#475569' }}>{fmt(p.purchaseRate)}</td>
-      <td style={{ ...S.td, fontWeight: 600, color: '#1e293b' }}>{fmt(p.saleRate)}</td>
+      <td style={{ ...S.td, fontWeight: 500, color: '#4b5563' }}>{fmt(p.purchaseRate)}</td>
+      <td style={{ ...S.td, fontWeight: 600, color: '#1a2235' }}>{fmt(p.saleRate)}</td>
       <td style={S.td}>
         <StockBadge stock={p.currentStock} reorder={p.reorderLevel} />
       </td>
-      <td style={{ ...S.td, color: '#64748b', fontSize: '13px' }}>{p.reorderLevel}</td>
-      <td style={{ ...S.td, color: '#64748b', fontSize: '13px' }}>{p.gstRate}%</td>
+      <td style={{ ...S.td, color: '#4b5563', fontSize: '13px' }}>{p.reorderLevel}</td>
+      <td style={{ ...S.td, color: '#4b5563', fontSize: '13px' }}>{p.gstRate}%</td>
       <td style={{ ...S.td, textAlign: 'center' }}>
         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
           <button
-            style={{ ...S.actionBtn('#6366f1', '#ede9fe'), border: 'none' }}
+            style={{ ...S.actionBtn('#5b5bd6', '#ede9fe'), border: 'none' }}
             onClick={onEdit}
             title="Edit"
             onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.75')}

@@ -35,11 +35,11 @@ const SOURCES = ['WHATSAPP', 'GMAIL', 'REFERRAL', 'WALK_IN', 'COLD_CALL', 'EXHIB
 
 const STATUS_COLOR: Record<string, string> = {
   NEW: '#3b82f6',
-  CONTACTED: '#6366f1',
+  CONTACTED: '#5b5bd6',
   QUOTED: '#f97316',
   NEGOTIATING: '#8b5cf6',
   WON: '#22c55e',
-  LOST: '#94a3b8',
+  LOST: '#9ca3af',
 };
 
 const STATUS_BG: Record<string, string> = {
@@ -48,7 +48,7 @@ const STATUS_BG: Record<string, string> = {
   QUOTED: '#fff7ed',
   NEGOTIATING: '#f5f3ff',
   WON: '#f0fdf4',
-  LOST: '#f8fafc',
+  LOST: '#f8f9fc',
 };
 
 const SOURCE_COLOR: Record<string, { bg: string; color: string }> = {
@@ -58,7 +58,7 @@ const SOURCE_COLOR: Record<string, { bg: string; color: string }> = {
   WALK_IN:   { bg: '#e0f2fe', color: '#0284c7' },
   COLD_CALL: { bg: '#f3e8ff', color: '#9333ea' },
   EXHIBITION:{ bg: '#fce7f3', color: '#db2777' },
-  MANUAL:    { bg: '#f1f5f9', color: '#475569' },
+  MANUAL:    { bg: '#f5f6fa', color: '#4b5563' },
 };
 
 const FLOW: Record<string, string[]> = {
@@ -96,14 +96,14 @@ const emptyForm = () => ({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const S = {
-  page: { padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: '#f8fafc' } as React.CSSProperties,
+  page: { padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: '#f8f9fc' } as React.CSSProperties,
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' } as React.CSSProperties,
-  h1: { fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.2 } as React.CSSProperties,
-  sub: { fontSize: '13px', color: '#64748b', marginTop: '4px' } as React.CSSProperties,
+  h1: { fontSize: '22px', fontWeight: 800, color: '#111827', margin: 0, lineHeight: 1.2 } as React.CSSProperties,
+  sub: { fontSize: '13px', color: '#4b5563', marginTop: '4px' } as React.CSSProperties,
   addBtn: {
     display: 'flex', alignItems: 'center', gap: '6px',
     padding: '9px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+    background: 'linear-gradient(135deg, #5b5bd6 0%, #4646b5 100%)',
     boxShadow: '0 4px 14px rgba(99,102,241,0.4)',
     color: '#fff', fontSize: '13px', fontWeight: 700,
     transition: 'transform 0.15s, box-shadow 0.15s',
@@ -114,21 +114,21 @@ const S = {
   } as React.CSSProperties,
   summaryCard: (color: string, bg: string): React.CSSProperties => ({
     background: '#fff', borderRadius: '12px', padding: '14px 16px',
-    border: `1px solid ${bg === '#f8fafc' ? '#e2e8f0' : bg}`,
+    border: `1px solid ${bg === '#f8f9fc' ? '#e4e7ef' : bg}`,
     boxShadow: '0 1px 6px rgba(15,23,42,0.05)',
   }),
   summaryLabel: (color: string): React.CSSProperties => ({
     fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em',
     textTransform: 'uppercase', color, marginBottom: '6px',
   }),
-  summaryCount: { fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: 1 } as React.CSSProperties,
-  summaryValue: { fontSize: '11px', color: '#64748b', marginTop: '3px' } as React.CSSProperties,
+  summaryCount: { fontSize: '22px', fontWeight: 800, color: '#111827', lineHeight: 1 } as React.CSSProperties,
+  summaryValue: { fontSize: '11px', color: '#4b5563', marginTop: '3px' } as React.CSSProperties,
 
   filterBar: { display: 'flex', gap: '6px', marginBottom: '20px', flexWrap: 'wrap' as const } as React.CSSProperties,
   filterTab: (active: boolean, color: string, bg: string): React.CSSProperties => ({
     padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
-    cursor: 'pointer', border: active ? 'none' : '1px solid #e2e8f0',
-    background: active ? color : '#fff', color: active ? '#fff' : '#64748b',
+    cursor: 'pointer', border: active ? 'none' : '1px solid #e4e7ef',
+    background: active ? color : '#fff', color: active ? '#fff' : '#4b5563',
     transition: 'all 0.15s',
     boxShadow: active ? `0 2px 8px ${color}55` : 'none',
   }),
@@ -138,13 +138,13 @@ const S = {
     boxShadow: '0 2px 16px rgba(15,23,42,0.06)',
     border: '1px solid rgba(226,232,240,0.8)', overflow: 'hidden',
   } as React.CSSProperties,
-  thead: { background: '#fafbff', borderBottom: '1px solid #f1f5f9' } as React.CSSProperties,
+  thead: { background: '#fafbff', borderBottom: '1px solid #f5f6fa' } as React.CSSProperties,
   th: {
-    padding: '11px 14px', fontSize: '11px', fontWeight: 700, color: '#64748b',
+    padding: '11px 14px', fontSize: '11px', fontWeight: 700, color: '#4b5563',
     letterSpacing: '0.06em', textTransform: 'uppercase' as const, textAlign: 'left' as const,
     whiteSpace: 'nowrap' as const,
   },
-  td: { padding: '13px 14px', fontSize: '13px', color: '#1e293b', verticalAlign: 'middle' as const },
+  td: { padding: '13px 14px', fontSize: '13px', color: '#1a2235', verticalAlign: 'middle' as const },
   tr: { borderBottom: '1px solid #f8fafc', transition: 'background 0.1s' } as React.CSSProperties,
 
   badge: (color: string, bg: string, clickable = false): React.CSSProperties => ({
@@ -157,13 +157,13 @@ const S = {
   }),
   actionBtn: (danger = false): React.CSSProperties => ({
     background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-    borderRadius: '7px', color: danger ? '#ef4444' : '#64748b',
+    borderRadius: '7px', color: danger ? '#ef4444' : '#4b5563',
     display: 'flex', alignItems: 'center', transition: 'background 0.12s, color 0.12s',
   }),
 
   empty: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-    padding: '64px 32px', color: '#94a3b8',
+    padding: '64px 32px', color: '#9ca3af',
   } as React.CSSProperties,
 
   // Modal
@@ -179,44 +179,44 @@ const S = {
   } as React.CSSProperties,
   modalHead: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9',
+    padding: '20px 24px 16px', borderBottom: '1px solid #f5f6fa',
     background: 'linear-gradient(135deg, #fafbff 0%, #f0f4ff 100%)',
   } as React.CSSProperties,
-  modalTitle: { fontSize: '16px', fontWeight: 800, color: '#0f172a' } as React.CSSProperties,
+  modalTitle: { fontSize: '16px', fontWeight: 800, color: '#111827' } as React.CSSProperties,
   modalBody: { padding: '20px 24px', overflowY: 'auto' as const, flex: 1 } as React.CSSProperties,
   modalFoot: {
-    padding: '14px 24px', borderTop: '1px solid #f1f5f9',
+    padding: '14px 24px', borderTop: '1px solid #f5f6fa',
     display: 'flex', gap: '10px', justifyContent: 'flex-end',
     background: '#fafbff',
   } as React.CSSProperties,
-  label: { display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#475569', marginBottom: '5px', letterSpacing: '0.04em' } as React.CSSProperties,
+  label: { display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#4b5563', marginBottom: '5px', letterSpacing: '0.04em' } as React.CSSProperties,
   input: (err = false): React.CSSProperties => ({
     width: '100%', boxSizing: 'border-box' as const,
-    padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', color: '#0f172a',
-    border: `1px solid ${err ? '#ef4444' : '#e2e8f0'}`,
+    padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', color: '#111827',
+    border: `1px solid ${err ? '#ef4444' : '#e4e7ef'}`,
     outline: 'none', background: '#fff', transition: 'border-color 0.15s, box-shadow 0.15s',
   }),
   select: {
     width: '100%', boxSizing: 'border-box' as const,
-    padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', color: '#0f172a',
-    border: '1px solid #e2e8f0', outline: 'none', background: '#fff',
+    padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', color: '#111827',
+    border: '1px solid #e4e7ef', outline: 'none', background: '#fff',
     cursor: 'pointer',
   } as React.CSSProperties,
   textarea: {
     width: '100%', boxSizing: 'border-box' as const,
-    padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', color: '#0f172a',
-    border: '1px solid #e2e8f0', outline: 'none', background: '#fff', resize: 'vertical' as const,
+    padding: '9px 12px', borderRadius: '9px', fontSize: '13.5px', color: '#111827',
+    border: '1px solid #e4e7ef', outline: 'none', background: '#fff', resize: 'vertical' as const,
     fontFamily: 'inherit', minHeight: '72px',
   } as React.CSSProperties,
   fgRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' } as React.CSSProperties,
   fg: { marginBottom: '14px' } as React.CSSProperties,
   cancelBtn: {
-    padding: '9px 20px', borderRadius: '9px', border: '1px solid #e2e8f0',
-    background: '#fff', color: '#475569', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+    padding: '9px 20px', borderRadius: '9px', border: '1px solid #e4e7ef',
+    background: '#fff', color: '#4b5563', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
   } as React.CSSProperties,
   saveBtn: {
     padding: '9px 24px', borderRadius: '9px', border: 'none', cursor: 'pointer',
-    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+    background: 'linear-gradient(135deg, #5b5bd6 0%, #4646b5 100%)',
     boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
     color: '#fff', fontSize: '13px', fontWeight: 700,
   } as React.CSSProperties,
@@ -230,7 +230,7 @@ const S = {
   dropdown: {
     position: 'absolute' as const, top: 'calc(100% + 4px)', left: 0,
     background: '#fff', borderRadius: '10px', minWidth: '150px', zIndex: 200,
-    boxShadow: '0 8px 30px rgba(15,23,42,0.16)', border: '1px solid #f1f5f9',
+    boxShadow: '0 8px 30px rgba(15,23,42,0.16)', border: '1px solid #f5f6fa',
     overflow: 'hidden',
   } as React.CSSProperties,
   dropItem: (color: string): React.CSSProperties => ({
@@ -241,11 +241,11 @@ const S = {
   partyResult: {
     position: 'absolute' as const, top: 'calc(100% + 2px)', left: 0, right: 0,
     background: '#fff', borderRadius: '10px', zIndex: 300,
-    boxShadow: '0 8px 24px rgba(15,23,42,0.12)', border: '1px solid #e2e8f0',
+    boxShadow: '0 8px 24px rgba(15,23,42,0.12)', border: '1px solid #e4e7ef',
     maxHeight: '200px', overflowY: 'auto' as const,
   } as React.CSSProperties,
   partyItem: {
-    padding: '9px 12px', cursor: 'pointer', fontSize: '13px', color: '#0f172a',
+    padding: '9px 12px', cursor: 'pointer', fontSize: '13px', color: '#111827',
     borderBottom: '1px solid #f8fafc', transition: 'background 0.1s',
   } as React.CSSProperties,
 };
@@ -267,7 +267,7 @@ function StatusBadge({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <span
-        style={S.badge(STATUS_COLOR[lead.status] || '#64748b', STATUS_BG[lead.status] || '#f8fafc', next.length > 0)}
+        style={S.badge(STATUS_COLOR[lead.status] || '#4b5563', STATUS_BG[lead.status] || '#f8f9fc', next.length > 0)}
         onClick={() => next.length > 0 && setOpen((p) => !p)}
       >
         {lead.status}
@@ -278,9 +278,9 @@ function StatusBadge({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id
           {next.map((s) => (
             <span
               key={s}
-              style={S.dropItem(STATUS_COLOR[s] || '#64748b')}
+              style={S.dropItem(STATUS_COLOR[s] || '#4b5563')}
               onClick={() => { onStatusChange(lead.id, s); setOpen(false); }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = STATUS_BG[s] || '#f8fafc'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = STATUS_BG[s] || '#f8f9fc'}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
             >
               → {s}
@@ -323,7 +323,7 @@ function PartySelector({
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <div style={{ position: 'relative' }}>
-        <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+        <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
         <input
           style={{ ...S.input(), paddingLeft: '30px', paddingRight: value ? '30px' : '12px' }}
           placeholder="Search party…"
@@ -332,7 +332,7 @@ function PartySelector({
           onChange={(e) => { onSearchChange(e.target.value); setOpen(true); }}
         />
         {value && (
-          <X size={13} onClick={onClear} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', cursor: 'pointer' }} />
+          <X size={13} onClick={onClear} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', cursor: 'pointer' }} />
         )}
       </div>
       {open && parties && parties.length > 0 && (
@@ -341,13 +341,13 @@ function PartySelector({
             <div
               key={p.id}
               style={S.partyItem}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f8fafc'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f8f9fc'}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
               onClick={() => { onSelect(p); setOpen(false); }}
             >
               <div style={{ fontWeight: 600 }}>{p.name}</div>
               {(p.phone || p.city) && (
-                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{[p.phone, p.city].filter(Boolean).join(' · ')}</div>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>{[p.phone, p.city].filter(Boolean).join(' · ')}</div>
               )}
             </div>
           ))}
@@ -419,7 +419,7 @@ function LeadModal({
         {/* Header */}
         <div style={S.modalHead}>
           <h2 style={S.modalTitle}>{isEdit ? 'Edit Lead' : 'Add New Lead'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}>
             <X size={18} />
           </button>
         </div>
@@ -528,15 +528,15 @@ function DeleteModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             <AlertTriangle size={18} color="#ef4444" />
             <h2 style={{ ...S.modalTitle, color: '#ef4444' }}>Delete Lead</h2>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={18} /></button>
         </div>
         <div style={{ padding: '24px' }}>
-          <p style={{ fontSize: '14px', color: '#1e293b', marginBottom: '6px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: '14px', color: '#1a2235', marginBottom: '6px', lineHeight: 1.6 }}>
             Are you sure you want to delete this lead
             {lead.party?.name ? <> for <strong>{lead.party.name}</strong></> : ''}?
           </p>
-          {lead.title && <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>"{lead.title}"</p>}
-          <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>This action cannot be undone.</p>
+          {lead.title && <p style={{ fontSize: '13px', color: '#4b5563', margin: 0 }}>"{lead.title}"</p>}
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '12px' }}>This action cannot be undone.</p>
         </div>
         <div style={S.modalFoot}>
           <button style={S.cancelBtn} onClick={onClose}>Cancel</button>
@@ -597,10 +597,10 @@ export default function LeadsPage() {
   }, [statusMutation]);
 
   const filterTabColor = (s: string) =>
-    s === 'ALL' ? '#6366f1' : STATUS_COLOR[s] || '#6366f1';
+    s === 'ALL' ? '#5b5bd6' : STATUS_COLOR[s] || '#5b5bd6';
 
   const filterTabBg = (s: string) =>
-    s === 'ALL' ? '#eef2ff' : STATUS_BG[s] || '#f8fafc';
+    s === 'ALL' ? '#eef2ff' : STATUS_BG[s] || '#f8f9fc';
 
   return (
     <div style={S.page}>
@@ -655,14 +655,14 @@ export default function LeadsPage() {
       <div style={S.tableCard}>
         {isLoading ? (
           <div style={S.empty}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '3px solid #e2e8f0', borderTopColor: '#6366f1', animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '3px solid #e4e7ef', borderTopColor: '#5b5bd6', animation: 'spin 0.8s linear infinite' }} />
             <p style={{ marginTop: '12px', fontSize: '13px' }}>Loading leads…</p>
           </div>
         ) : leads.length === 0 ? (
           <div style={S.empty}>
-            <TrendingUp size={36} color="#cbd5e1" />
-            <p style={{ marginTop: '12px', fontSize: '14px', fontWeight: 600, color: '#64748b' }}>No leads found</p>
-            <p style={{ fontSize: '12px', marginTop: '4px', color: '#94a3b8' }}>
+            <TrendingUp size={36} color="#d1d5db" />
+            <p style={{ marginTop: '12px', fontSize: '14px', fontWeight: 600, color: '#4b5563' }}>No leads found</p>
+            <p style={{ fontSize: '12px', marginTop: '4px', color: '#9ca3af' }}>
               {statusFilter === 'ALL' ? 'Add your first lead to start tracking your pipeline.' : `No leads with status ${statusFilter}.`}
             </p>
           </div>
@@ -687,15 +687,15 @@ export default function LeadsPage() {
                   >
                     {/* Party */}
                     <td style={S.td}>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>{lead.party?.name ?? <span style={{ color: '#94a3b8' }}>—</span>}</div>
+                      <div style={{ fontWeight: 700, color: '#111827', fontSize: '13px' }}>{lead.party?.name ?? <span style={{ color: '#9ca3af' }}>—</span>}</div>
                       {lead.party?.phone && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#4b5563', marginTop: '2px' }}>
                           <Phone size={9} />
                           {lead.party.phone}
                         </div>
                       )}
                       {lead.party?.city && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
                           <MapPin size={9} />
                           {lead.party.city}
                         </div>
@@ -705,34 +705,34 @@ export default function LeadsPage() {
                     {/* Title */}
                     <td style={{ ...S.td, maxWidth: '160px' }}>
                       <div style={{ fontWeight: 600, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {lead.title || <span style={{ color: '#94a3b8' }}>—</span>}
+                        {lead.title || <span style={{ color: '#9ca3af' }}>—</span>}
                       </div>
                     </td>
 
                     {/* Product Interest */}
-                    <td style={{ ...S.td, maxWidth: '140px', color: '#475569', fontSize: '12.5px' }}>
+                    <td style={{ ...S.td, maxWidth: '140px', color: '#4b5563', fontSize: '12.5px' }}>
                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {lead.productInterest || <span style={{ color: '#94a3b8' }}>—</span>}
+                        {lead.productInterest || <span style={{ color: '#9ca3af' }}>—</span>}
                       </div>
                     </td>
 
                     {/* Est. Value */}
-                    <td style={{ ...S.td, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...S.td, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap' }}>
                       {fmt(lead.estimatedValue)}
                     </td>
 
                     {/* Est. Qty */}
-                    <td style={{ ...S.td, color: '#475569', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...S.td, color: '#4b5563', whiteSpace: 'nowrap' }}>
                       {lead.estimatedQty != null ? lead.estimatedQty.toLocaleString('en-IN') : '—'}
                     </td>
 
                     {/* Source */}
                     <td style={S.td}>
                       {lead.source ? (
-                        <span style={S.badge(SOURCE_COLOR[lead.source]?.color ?? '#475569', SOURCE_COLOR[lead.source]?.bg ?? '#f1f5f9')}>
+                        <span style={S.badge(SOURCE_COLOR[lead.source]?.color ?? '#4b5563', SOURCE_COLOR[lead.source]?.bg ?? '#f5f6fa')}>
                           {lead.source.replace('_', ' ')}
                         </span>
-                      ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                      ) : <span style={{ color: '#9ca3af' }}>—</span>}
                     </td>
 
                     {/* Status */}
@@ -744,17 +744,17 @@ export default function LeadsPage() {
                     <td style={{ ...S.td, whiteSpace: 'nowrap' }}>
                       {lead.followUpDate ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Calendar size={11} color={pastDue ? '#ef4444' : '#94a3b8'} />
-                          <span style={{ fontSize: '12px', fontWeight: pastDue ? 700 : 500, color: pastDue ? '#ef4444' : '#64748b' }}>
+                          <Calendar size={11} color={pastDue ? '#ef4444' : '#9ca3af'} />
+                          <span style={{ fontSize: '12px', fontWeight: pastDue ? 700 : 500, color: pastDue ? '#ef4444' : '#4b5563' }}>
                             {fmtDate(lead.followUpDate)}
                           </span>
                           {pastDue && <span style={{ fontSize: '10px', fontWeight: 700, color: '#ef4444', background: '#fef2f2', padding: '1px 5px', borderRadius: '4px' }}>OVERDUE</span>}
                         </div>
-                      ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                      ) : <span style={{ color: '#9ca3af' }}>—</span>}
                     </td>
 
                     {/* Created */}
-                    <td style={{ ...S.td, fontSize: '12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...S.td, fontSize: '12px', color: '#9ca3af', whiteSpace: 'nowrap' }}>
                       {fmtDate(lead.createdAt)}
                     </td>
 
@@ -765,7 +765,7 @@ export default function LeadsPage() {
                           title="Edit lead"
                           style={S.actionBtn()}
                           onClick={() => setEditLead(lead)}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f1f5f9'}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f5f6fa'}
                           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
                         >
                           <Pencil size={14} />
