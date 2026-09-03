@@ -152,7 +152,7 @@ integrationsRouter.post('/whatsapp/test', async (req, res, next) => {
         messaging_product: 'whatsapp',
         to: target,
         type: 'text',
-        text: { body: '✅ GSpaces AI CRM — WhatsApp connection test successful! Your messages will now appear in the Inbox automatically.' },
+        text: { body: '✅ GSpaces TextileIQ — WhatsApp connection test successful! Your messages will now appear in the Inbox automatically.' },
       },
       {
         headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },

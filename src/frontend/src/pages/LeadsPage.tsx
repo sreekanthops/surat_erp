@@ -607,7 +607,7 @@ export default function LeadsPage() {
       {/* ── Header ── */}
       <div style={S.row}>
         <div>
-          <h1 style={S.h1}>Leads & CRM</h1>
+          <h1 style={S.h1}>Leads & Pipeline</h1>
           <p style={S.sub}>Sales pipeline</p>
         </div>
         <button

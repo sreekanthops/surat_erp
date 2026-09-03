@@ -68,7 +68,7 @@ export default function LoginPage() {
           }}>🧵</div>
 
           <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc', margin: '0 0 12px', lineHeight: 1.2 }}>
-            GSpaces<br />AI CRM
+            GSpaces<br />TextileIQ
           </h1>
           <p style={{ fontSize: '14px', color: 'rgba(148,163,184,0.85)', lineHeight: 1.7, margin: 0 }}>
             Manage your textile business end-to-end.<br />

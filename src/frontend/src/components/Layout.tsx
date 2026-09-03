@@ -54,7 +54,7 @@ export default function Layout() {
                 fontSize: '13px', fontWeight: 700, color: '#f8fafc',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
-                {user?.tenant?.name || 'GSpaces AI CRM'}
+                {user?.tenant?.name || 'GSpaces TextileIQ'}
               </div>
               {user?.tenant?.plan && (
                 <div style={{

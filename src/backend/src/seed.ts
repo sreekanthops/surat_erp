@@ -20,7 +20,7 @@ async function main() {
     where:  { id: TENANT_ID },
     update: {},
     create: {
-      id: TENANT_ID, name: 'GSpaces AI CRM', gstin: '24AABCS1429B1ZB',
+      id: TENANT_ID, name: 'GSpaces TextileIQ', gstin: '24AABCS1429B1ZB',
       address: 'Ring Road, Surat', city: 'Surat', state: 'Gujarat',
       phone: '7075077384', email: 'shah@shahfabrics.com',
       plan: 'GROWTH', planExpiresAt: addDays(new Date(), 365), isActive: true,

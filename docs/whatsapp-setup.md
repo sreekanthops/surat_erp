@@ -1,7 +1,7 @@
 # 📱 WhatsApp Business API — Complete Setup Guide
 
 > **For beginners.** This guide walks you through connecting your WhatsApp Business number
-> to GSpaces AI CRM so you can receive and reply to customer messages directly from the app.
+> to GSpaces TextileIQ so you can receive and reply to customer messages directly from the app.
 
 ---
 
@@ -44,7 +44,7 @@ Open [developers.facebook.com](https://developers.facebook.com) and log in with 
 1. Click **"My Apps"** → **"Create App"**
 2. Choose **"Business"** as the app type
 3. Fill in:
-   - **App name:** `GSpaces AI CRM` (or any name)
+   - **App name:** `GSpaces TextileIQ` (or any name)
    - **Contact email:** your email
    - **Business Account:** select your business (or create one)
 4. Click **"Create app"**
@@ -208,7 +208,7 @@ from Part 4. Click **"Done, Test it →"**.
 Enter your phone number and click **"📱 Send Test Message"**.
 
 You should receive a WhatsApp message on your phone saying:
-> ✅ GSpaces AI CRM — WhatsApp connection test successful!
+> ✅ GSpaces TextileIQ — WhatsApp connection test successful!
 
 ---
 
@@ -230,7 +230,7 @@ Open [business.facebook.com/settings](https://business.facebook.com/settings)
 ### Step 7.3 — Assign App Access
 
 1. Click **"Add assets"** on the new system user
-2. Left panel → **Apps** → select your app (`GSpaces AI CRM`)
+2. Left panel → **Apps** → select your app (`GSpaces TextileIQ`)
 3. Toggle **Full control**
 4. Click **Save**
 
@@ -355,4 +355,4 @@ WHATSAPP_WABA_ID=1724324769011254                  # WhatsApp Business Account I
 
 ---
 
-*Last updated: August 2026 | GSpaces AI CRM*
+*Last updated: August 2026 | GSpaces TextileIQ*

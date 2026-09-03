@@ -153,7 +153,7 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
      Message: "${s.messages[0] || ''}"`;
   }).join('\n');
 
-  return `=== LIVE BUSINESS DATA for GSpaces AI CRM (as of ${todayDateStr}) ===
+  return `=== LIVE BUSINESS DATA for GSpaces TextileIQ (as of ${todayDateStr}) ===
 
 TODAY'S SALES:
   Total: ${fmt(todaySales._sum.totalAmount)} across ${todaySales._count} invoices
@@ -187,7 +187,7 @@ async function buildSystemPrompt(tenantId: string): Promise<string> {
   const liveData = await fetchLiveContext(tenantId);
   const today    = new Date().toISOString().split('T')[0];
 
-  return `You are an expert AI business assistant for GSpaces AI CRM, a textile business in Surat, India.
+  return `You are an expert AI business assistant for GSpaces TextileIQ, a textile business in Surat, India.
 You have access to REAL-TIME business data fetched directly from the database. Use this data to answer questions precisely.
 
 ${liveData}
