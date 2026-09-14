@@ -10,7 +10,7 @@ const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/inventory',  icon: Package,         label: 'Inventory' },
   { to: '/sales',      icon: Receipt,         label: 'Sales' },
-  { to: '/inbox',      icon: MessageSquare,   label: 'Inbox' },
+  { to: '/whatsapp',   icon: MessageSquare,   label: 'WhatsApp' },
   { to: '/gmail',      icon: Mail,            label: 'Gmail' },
   { to: '/leads',      icon: TrendingUp,      label: 'Leads' },
   { to: '/parties',    icon: Users,           label: 'Parties' },

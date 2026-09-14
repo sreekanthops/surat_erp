@@ -5,7 +5,7 @@ import api from '@/hooks/useApi';
 import {
   RefreshCw, Mail, MailOpen, Search, Send, X,
   ExternalLink, AlertCircle, CheckCircle, Loader,
-  Inbox, Unlink,
+  Inbox, Unlink, Plus,
 } from 'lucide-react';
 
 interface GmailMsg {
@@ -286,6 +286,10 @@ export default function GmailPage() {
   const [connectLoading, setConnectLoading] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [bannerMsg, setBannerMsg] = useState('');
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeTo, setComposeTo] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
 
   // Handle OAuth redirect result
   useEffect(() => {
@@ -382,6 +386,27 @@ export default function GmailPage() {
     },
   });
 
+  // Compose fresh email
+  const composeMut = useMutation({
+    mutationFn: () => api.post('/api/v1/integrations/gmail/compose', {
+      to: composeTo,
+      subject: composeSubject,
+      body: composeBody,
+    }),
+    onSuccess: () => {
+      setShowCompose(false);
+      setComposeTo('');
+      setComposeSubject('');
+      setComposeBody('');
+      setSyncMsg('✅ Email sent successfully!');
+      qc.invalidateQueries({ queryKey: ['gmail-inbox'] });
+      setTimeout(() => setSyncMsg(''), 4000);
+    },
+    onError: (e: any) => {
+      alert(`❌ ${e?.response?.data?.error || 'Failed to send email'}`);
+    },
+  });
+
   const openEmail = useCallback((msg: GmailMsg) => {
     setSelected(msg);
     if (!msg.isRead) markReadMut.mutate(msg.id);
@@ -424,6 +449,19 @@ export default function GmailPage() {
 
         {gmailStatus.isActive && (
           <>
+            {/* Compose Button */}
+            <button
+              onClick={() => setShowCompose(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                borderRadius: '9px', border: 'none', cursor: 'pointer',
+                background: '#5b5bd6', color: '#fff', fontSize: '13px', fontWeight: 700,
+                fontFamily: 'inherit',
+              }}
+            >
+              <Plus size={14} /> Compose Email
+            </button>
+
             {/* Unread filter */}
             <button
               onClick={() => setUnreadOnly(v => !v)}
@@ -445,10 +483,9 @@ export default function GmailPage() {
               disabled={syncMut.isPending}
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-                borderRadius: '9px', border: 'none', cursor: syncMut.isPending ? 'not-allowed' : 'pointer',
-                background: '#5b5bd6', color: '#fff', fontSize: '13px', fontWeight: 600,
+                borderRadius: '9px', border: '1.5px solid #e4e7ef', cursor: syncMut.isPending ? 'not-allowed' : 'pointer',
+                background: '#fff', color: '#374151', fontSize: '13px', fontWeight: 600,
                 fontFamily: 'inherit', opacity: syncMut.isPending ? 0.7 : 1,
-                boxShadow: '0 2px 6px rgba(91,91,214,0.3)',
               }}
             >
               <RefreshCw size={13} style={{ animation: syncMut.isPending ? 'spin 1s linear infinite' : 'none' }} />
@@ -590,6 +627,74 @@ export default function GmailPage() {
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* ── Compose Modal ── */}
+      {showCompose && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#fff', width: '560px', borderRadius: 14, overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Mail size={18} color="#5b5bd6" />
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>New Email</h3>
+              </div>
+              <button onClick={() => setShowCompose(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>To</label>
+                <input
+                  type="email"
+                  placeholder="recipient@example.com"
+                  value={composeTo}
+                  onChange={e => setComposeTo(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Subject</label>
+                <input
+                  type="text"
+                  placeholder="Subject line..."
+                  value={composeSubject}
+                  onChange={e => setComposeSubject(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Message</label>
+                <textarea
+                  rows={6}
+                  placeholder="Write your email here..."
+                  value={composeBody}
+                  onChange={e => setComposeBody(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box', marginTop: 3, resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                onClick={() => setShowCompose(false)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => composeMut.mutate()}
+                disabled={!composeTo || !composeSubject || !composeBody || composeMut.isPending}
+                style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#5b5bd6', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', opacity: (!composeTo || !composeSubject || !composeBody) ? 0.6 : 1 }}
+              >
+                {composeMut.isPending ? 'Sending...' : 'Send Email'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

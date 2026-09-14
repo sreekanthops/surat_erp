@@ -38,6 +38,8 @@ model Tenant {
   transactions         Transaction[]
   stockMovements       StockMovement[]
   messages             Message[]
+  waConversations      WaConversation[]
+  waTemplates          WaTemplate[]
   leads                Lead[]
   cashFlowDaily        CashFlowDaily[]
   integrationConfigs   IntegrationConfig[]
@@ -97,6 +99,8 @@ model User {
 
   transactions    Transaction[]
   leadsAssigned   Lead[]        @relation("AssignedLeads")
+  waAssignedChats WaConversation[] @relation("AssignedAgent")
+  waSentMessages  WaMessage[]   @relation("AgentMessages")
   aiChatSessions  AiChatSession[]
   auditLogs       AuditLog[]
 
@@ -139,6 +143,7 @@ model Party {
 
   transactions   Transaction[]
   messages       Message[]
+  waConversations WaConversation[]
   leads          Lead[]
 
   @@index([tenantId])
@@ -395,6 +400,79 @@ enum MessageChannel {
 enum Direction {
   INBOUND
   OUTBOUND
+}
+
+// ─────────────────────────────────────────────
+// DEDICATED WHATSAPP MODULE
+// ─────────────────────────────────────────────
+model WaConversation {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String       @db.Uuid
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  partyId          String?      @db.Uuid
+  party            Party?       @relation(fields: [partyId], references: [id], onDelete: SetNull)
+  phoneNumber      String       @db.VarChar(20)
+  contactName      String?      @db.VarChar(255)
+  lastMessageAt    DateTime?
+  windowExpiresAt  DateTime?
+  assignedAgentId  String?      @db.Uuid
+  assignedAgent    User?        @relation("AssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  status           String       @default("open") @db.VarChar(20) // open, closed
+  unreadCount      Int          @default(0)
+  latestContent    String?
+  aiIntent         String?      @db.VarChar(50)
+  aiSentiment      String?      @db.VarChar(20)
+  customerScore    Int?         @default(0)
+  customerSignals  String[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  messages         WaMessage[]
+
+  @@unique([tenantId, phoneNumber])
+  @@index([tenantId, lastMessageAt(sort: Desc)])
+  @@index([tenantId, status])
+  @@map("wa_conversations")
+}
+
+model WaMessage {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId   String         @db.Uuid
+  conversation     WaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  waMessageId      String?        @unique @db.VarChar(100)
+  direction        Direction
+  messageType      String         @default("text") @db.VarChar(20) // text, template, image, document, audio, video
+  content          String?
+  mediaUrl         String?
+  status           String         @default("sent") @db.VarChar(20) // sent, delivered, read, failed
+  errorMessage     String?
+  sentByAgentId    String?        @db.Uuid
+  sentByAgent      User?          @relation("AgentMessages", fields: [sentByAgentId], references: [id], onDelete: SetNull)
+  templateName     String?        @db.VarChar(100)
+  templateParams   Json?
+  createdAt        DateTime       @default(now())
+
+  @@index([conversationId, createdAt(sort: Asc)])
+  @@map("wa_messages")
+}
+
+model WaTemplate {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String       @db.Uuid
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  metaTemplateName String       @db.VarChar(100)
+  category         String?      @db.VarChar(30) // MARKETING, UTILITY, AUTHENTICATION
+  language         String       @default("en") @db.VarChar(10)
+  body             String?
+  header           String?
+  footer           String?
+  buttons          Json?
+  status           String       @default("APPROVED") @db.VarChar(20) // APPROVED, PENDING, REJECTED
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([tenantId, metaTemplateName, language])
+  @@map("wa_templates")
 }
 
 // ─────────────────────────────────────────────

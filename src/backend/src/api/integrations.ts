@@ -604,6 +604,74 @@ integrationsRouter.post('/gmail/reply', async (req, res, next) => {
   }
 });
 
+// ── POST /api/v1/integrations/gmail/compose ────────────────────────────────────
+// Send a fresh new email via connected Gmail account
+integrationsRouter.post('/gmail/compose', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const { to, subject, body } = req.body;
+    if (!to || !body || !subject) return res.status(400).json({ error: 'to, subject, and body are required' });
+
+    const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL', isActive: true } });
+    if (!cfg) return res.status(400).json({ error: 'Gmail not connected. Please connect your Gmail first.' });
+
+    const { accessToken, refreshToken, expiryDate, email: connectedEmail } = cfg.config as any;
+    const oauth2 = await getOAuthClient(tenantId);
+    oauth2.setCredentials({ access_token: accessToken, refresh_token: refreshToken, expiry_date: expiryDate });
+    const { credentials } = await oauth2.refreshAccessToken();
+    oauth2.setCredentials(credentials);
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2 });
+
+    const raw = [
+      `From: ${connectedEmail}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      body,
+    ].filter(Boolean).join('\r\n');
+
+    const encoded = Buffer.from(raw).toString('base64url');
+    const sent = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw: encoded },
+    });
+
+    // Find or create party if needed
+    const toEmail = (to.match(/<([^>]+)>/) || [])[1] || to.trim();
+    let party = await prisma.party.findFirst({ where: { tenantId, email: toEmail } });
+    if (!party && toEmail) {
+      party = await prisma.party.create({
+        data: { tenantId, name: toEmail, email: toEmail, type: 'CUSTOMER' },
+      }).catch(() => null);
+    }
+
+    // Store outbound message
+    const msg = await prisma.message.create({
+      data: {
+        tenantId,
+        partyId: party?.id,
+        channel: 'GMAIL',
+        direction: 'OUTBOUND',
+        fromAddress: connectedEmail,
+        toAddress: to,
+        subject,
+        content: body,
+        threadId: sent.data.threadId,
+        externalId: sent.data.id || undefined,
+        isRead: true,
+        isReplied: false,
+      },
+    });
+
+    return res.status(201).json({ ok: true, messageId: sent.data.id, msg });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── GET /api/v1/integrations/gmail/inbox ─────────────────────────────────────
 // Paginated list of Gmail messages stored in DB
 integrationsRouter.get('/gmail/inbox', async (req, res, next) => {
