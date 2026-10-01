@@ -100,8 +100,9 @@ app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '127.0.0.1';
 
-server.listen(PORT, async () => {
+server.listen(PORT, HOST, async () => {
   logger.info(`🚀 Backend running on port ${PORT}`);
   await initQueues();
   logger.info('✅ BullMQ workers started');
