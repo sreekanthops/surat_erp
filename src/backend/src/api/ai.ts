@@ -6,7 +6,7 @@ import { z } from 'zod';
 export const aiRouter = Router();
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-const OPENROUTER_MODEL   = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free';
+const OPENROUTER_MODEL   = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free';
 
 const chatSchema = z.object({
   sessionId: z.string().uuid().nullish(),
