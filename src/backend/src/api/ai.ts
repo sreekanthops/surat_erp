@@ -6,7 +6,15 @@ import { z } from 'zod';
 export const aiRouter = Router();
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-const OPENROUTER_MODEL   = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free';
+// Fallback chain — tried in order if the previous model returns 429/503
+const FREE_MODELS = process.env.OPENROUTER_MODEL
+  ? [process.env.OPENROUTER_MODEL]
+  : [
+      'google/gemma-4-31b-it:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'qwen/qwen3.8-27b:free',
+      'nvidia/nemotron-3.5-lightning:free',
+    ];
 
 const chatSchema = z.object({
   sessionId: z.string().uuid().nullish(),
@@ -272,19 +280,34 @@ aiRouter.post('/chat', async (req, res, next) => {
       { role: 'user',   content: body.message },
     ];
 
-    const orRes = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      { model: OPENROUTER_MODEL, messages, temperature: 0.2, max_tokens: 1200 },
-      {
-        headers: {
-          Authorization:  `Bearer ${OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer':  'https://surat-textile-dashboard.app',
-          'X-Title':       'Surat Textile Dashboard',
-        },
-        timeout: 30000,
+    let orRes: any;
+    let lastErr: any;
+    for (const model of FREE_MODELS) {
+      try {
+        orRes = await axios.post(
+          'https://openrouter.ai/api/v1/chat/completions',
+          { model, messages, temperature: 0.2, max_tokens: 1200 },
+          {
+            headers: {
+              Authorization:  `Bearer ${OPENROUTER_API_KEY}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer':  'https://surat-textile-dashboard.app',
+              'X-Title':       'Surat Textile Dashboard',
+            },
+            timeout: 30000,
+          }
+        );
+        break; // success — stop trying
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 429 || status === 503 || status === 404) {
+          lastErr = err;
+          continue; // try next model
+        }
+        throw err; // non-retryable error
       }
-    );
+    }
+    if (!orRes) throw lastErr;
 
     const rawResponse = orRes.data.choices[0].message.content || '';
     const tokensUsed  = orRes.data.usage?.total_tokens ?? null;
@@ -335,19 +358,34 @@ aiRouter.get('/suggestions', async (req, res, next) => {
 
     const prompt = `Based on this real business data:\n${liveData}\n\nGenerate 3-5 specific, actionable morning suggestions in Hinglish for the owner. Include any hot WhatsApp leads that need follow-up. Use actual party names and amounts from the data. Return as JSON array of strings only.`;
 
-    const orRes = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      { model: OPENROUTER_MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0.4, max_tokens: 400 },
-      {
-        headers: {
-          Authorization:  `Bearer ${OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer':  'https://surat-textile-dashboard.app',
-          'X-Title':       'Surat Textile Dashboard',
-        },
-        timeout: 30000,
+    let orRes: any;
+    let lastErr: any;
+    for (const model of FREE_MODELS) {
+      try {
+        orRes = await axios.post(
+          'https://openrouter.ai/api/v1/chat/completions',
+          { model, messages: [{ role: 'user', content: prompt }], temperature: 0.4, max_tokens: 400 },
+          {
+            headers: {
+              Authorization:  `Bearer ${OPENROUTER_API_KEY}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer':  'https://surat-textile-dashboard.app',
+              'X-Title':       'Surat Textile Dashboard',
+            },
+            timeout: 30000,
+          }
+        );
+        break;
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 429 || status === 503 || status === 404) {
+          lastErr = err;
+          continue;
+        }
+        throw err;
       }
-    );
+    }
+    if (!orRes) throw lastErr;
     return res.json({ suggestions: orRes.data.choices[0].message.content });
   } catch (err) {
     next(err);
