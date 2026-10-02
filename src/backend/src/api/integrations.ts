@@ -15,22 +15,17 @@ export const gmailCallbackRouter = Router();
 const GMAIL_CALLBACK = process.env.GOOGLE_REDIRECT_URI
   || `${process.env.API_URL || 'http://localhost:3001'}/api/v1/integrations/gmail/callback`;
 
-async function getGoogleCreds(tenantId: string): Promise<{ clientId: string; clientSecret: string; redirectUri: string }> {
-  const cfg = await prisma.integrationConfig.findFirst({
-    where: { tenantId, type: 'GMAIL' },
-    select: { config: true },
-  });
-  const stored = (cfg?.config as any) || {};
+// Single shared OAuth app — credentials live in server .env only, not per-tenant DB
+function getGoogleCreds(): { clientId: string; clientSecret: string; redirectUri: string } {
   return {
-    clientId:     stored.googleClientId     || process.env.GOOGLE_CLIENT_ID     || '',
-    clientSecret: stored.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET || '',
-    // Always use the canonical backend callback — never trust a stored value that may be stale
+    clientId:     process.env.GOOGLE_CLIENT_ID     || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     redirectUri:  GMAIL_CALLBACK,
   };
 }
 
-async function getOAuthClient(tenantId: string) {
-  const { clientId, clientSecret, redirectUri } = await getGoogleCreds(tenantId);
+function getOAuthClient() {
+  const { clientId, clientSecret, redirectUri } = getGoogleCreds();
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
@@ -78,74 +73,13 @@ function extractBody(parts: any[]): string {
 }
 
 // ── GET /api/v1/integrations/app-credentials ─────────────────────────────────
-// Returns the tenant's saved Google OAuth app credentials (clientId only — never secret)
-// OWNER / MANAGER only
-integrationsRouter.get('/app-credentials', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
-  try {
-    const tenantId = (req as any).user.tenantId;
-    const cfg = await prisma.integrationConfig.findFirst({
-      where: { tenantId, type: 'GMAIL' },
-      select: { config: true },
-    });
-    const stored = (cfg?.config as any) || {};
-    // Always return the canonical URI — same one the backend will actually use
-    const redirectUri = GMAIL_CALLBACK;
-    return res.json({
-      googleClientId:    stored.googleClientId || '',
-      googleRedirectUri: redirectUri,
-      hasClientSecret:   !!(stored.googleClientSecret),
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ── PUT /api/v1/integrations/app-credentials ─────────────────────────────────
-// Admin saves Google OAuth client credentials for this tenant
-// OWNER / MANAGER only
-integrationsRouter.put('/app-credentials', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
-  try {
-    const tenantId = (req as any).user.tenantId;
-    const { googleClientId, googleClientSecret, googleRedirectUri } = req.body;
-
-    if (!googleClientId) {
-      return res.status(400).json({ error: 'googleClientId is required' });
-    }
-
-    // Merge into existing GMAIL config (preserving access/refresh tokens and existing secret)
-    const existing = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL' } });
-    const existingConfig = (existing?.config as any) || {};
-
-    // If no new secret provided, keep the stored one; if no stored one either, it's required
-    const resolvedSecret = googleClientSecret || existingConfig.googleClientSecret || '';
-    if (!resolvedSecret) {
-      return res.status(400).json({ error: 'googleClientSecret is required (not yet saved)' });
-    }
-
-    await prisma.integrationConfig.upsert({
-      where: { tenantId_type: { tenantId, type: 'GMAIL' } },
-      update: {
-        config: {
-          ...existingConfig,
-          googleClientId,
-          googleClientSecret: resolvedSecret,
-          googleRedirectUri: GMAIL_CALLBACK,   // always overwrite with canonical URI
-        },
-      },
-      create: {
-        tenantId, type: 'GMAIL', isActive: false,
-        config: {
-          googleClientId,
-          googleClientSecret: resolvedSecret,
-          googleRedirectUri: GMAIL_CALLBACK,
-        },
-      },
-    });
-
-    return res.json({ ok: true, googleRedirectUri: GMAIL_CALLBACK });
-  } catch (err) {
-    next(err);
-  }
+// Returns the shared redirect URI so the Settings UI can display it to the user
+integrationsRouter.get('/app-credentials', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (_req, res) => {
+  return res.json({
+    googleClientId:    '',           // not exposed — managed by server admin
+    googleRedirectUri: GMAIL_CALLBACK,
+    hasClientSecret:   !!(process.env.GOOGLE_CLIENT_SECRET),
+  });
 });
 
 // ── GET /api/v1/integrations/status ──────────────────────────────────────────
@@ -330,9 +264,9 @@ integrationsRouter.post('/tally/sync', async (req, res, next) => {
 integrationsRouter.get('/gmail/connect', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
-    const { clientId } = await getGoogleCreds(tenantId);
-    if (!clientId) return res.status(400).json({ error: 'Google OAuth credentials not configured. Go to Settings → Integrations → Google OAuth and save your Client ID and Secret first.' });
-    const oauth2 = await getOAuthClient(tenantId);
+    const { clientId } = getGoogleCreds();
+    if (!clientId) return res.status(400).json({ error: 'Gmail is not configured on this server. Contact your administrator.' });
+    const oauth2 = getOAuthClient();
     const url = oauth2.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
@@ -358,7 +292,7 @@ gmailCallbackRouter.get('/', async (req, res, next) => {
     if (error) return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?error=${encodeURIComponent(error)}`);
     if (!code || !tenantId) return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?error=missing_params`);
 
-    const oauth2 = await getOAuthClient(tenantId);
+    const oauth2 = getOAuthClient();
     const { tokens } = await oauth2.getToken(code);
     oauth2.setCredentials(tokens);
 
@@ -367,21 +301,12 @@ gmailCallbackRouter.get('/', async (req, res, next) => {
     const { data: profile } = await oauth2Info.userinfo.get();
     const email = profile.email || '';
 
-    // Preserve existing google credentials (clientId, clientSecret) when saving tokens
-    const existing = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL' } });
-    const existingConfig = (existing?.config as any) || {};
-
+    // Store only OAuth tokens — no per-tenant credentials needed
     await prisma.integrationConfig.upsert({
       where: { tenantId_type: { tenantId, type: 'GMAIL' } },
       update: {
         isActive: true, syncStatus: 'connected', lastSyncAt: new Date(),
-        config: {
-          ...existingConfig,
-          email,
-          accessToken:  tokens.access_token,
-          refreshToken: tokens.refresh_token || existingConfig.refreshToken,
-          expiryDate:   tokens.expiry_date,
-        },
+        config: { email, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiryDate: tokens.expiry_date },
       },
       create: {
         tenantId, type: 'GMAIL', isActive: true, syncStatus: 'connected', lastSyncAt: new Date(),
@@ -400,20 +325,9 @@ gmailCallbackRouter.get('/', async (req, res, next) => {
 integrationsRouter.delete('/gmail/disconnect', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
-    // Preserve google credentials (clientId/secret), only clear OAuth tokens
-    const existing = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL' } });
-    const existingConfig = (existing?.config as any) || {};
     await prisma.integrationConfig.updateMany({
       where: { tenantId, type: 'GMAIL' },
-      data: {
-        isActive: false, syncStatus: 'disconnected',
-        config: {
-          googleClientId:     existingConfig.googleClientId    || '',
-          googleClientSecret: existingConfig.googleClientSecret || '',
-          googleRedirectUri:  existingConfig.googleRedirectUri  || '',
-          // tokens cleared:
-        },
-      },
+      data: { isActive: false, syncStatus: 'disconnected', config: {} },
     });
     return res.json({ ok: true });
   } catch (err) {
@@ -432,7 +346,7 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
     if (!cfg) return res.status(400).json({ error: 'Gmail not connected. Connect Gmail first.' });
 
     const { accessToken, refreshToken, expiryDate, email: connectedEmail } = cfg.config as any;
-    const oauth2 = await getOAuthClient(tenantId);
+    const oauth2 = getOAuthClient();
     oauth2.setCredentials({ access_token: accessToken, refresh_token: refreshToken, expiry_date: expiryDate });
 
     // Auto-refresh token
@@ -560,7 +474,7 @@ integrationsRouter.post('/gmail/reply', async (req, res, next) => {
     if (!cfg) return res.status(400).json({ error: 'Gmail not connected' });
 
     const { accessToken, refreshToken, expiryDate, email: connectedEmail } = cfg.config as any;
-    const oauth2 = await getOAuthClient(tenantId);
+    const oauth2 = getOAuthClient();
     oauth2.setCredentials({ access_token: accessToken, refresh_token: refreshToken, expiry_date: expiryDate });
     const { credentials } = await oauth2.refreshAccessToken();
     oauth2.setCredentials(credentials);
@@ -616,7 +530,7 @@ integrationsRouter.post('/gmail/compose', async (req, res, next) => {
     if (!cfg) return res.status(400).json({ error: 'Gmail not connected. Please connect your Gmail first.' });
 
     const { accessToken, refreshToken, expiryDate, email: connectedEmail } = cfg.config as any;
-    const oauth2 = await getOAuthClient(tenantId);
+    const oauth2 = getOAuthClient();
     oauth2.setCredentials({ access_token: accessToken, refresh_token: refreshToken, expiry_date: expiryDate });
     const { credentials } = await oauth2.refreshAccessToken();
     oauth2.setCredentials(credentials);

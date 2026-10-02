@@ -323,51 +323,12 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function GmailSection({ gmailStatus, appCreds, onRefresh }: {
+function GmailSection({ gmailStatus, onRefresh }: {
   gmailStatus: GmailStatus | null;
-  appCreds: AppCreds | null;
   onRefresh: () => void;
 }) {
-  const [form, setForm] = useState({ googleClientId: '', googleClientSecret: '' });
-  const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
-
-  // The redirect URI is always driven by the server — read-only in the UI
-  const redirectUri = appCreds?.googleRedirectUri || 'http://localhost:3001/api/v1/integrations/gmail/callback';
-
-  useEffect(() => {
-    if (appCreds) {
-      setForm(f => ({ ...f, googleClientId: appCreds.googleClientId || '' }));
-    }
-  }, [appCreds]);
-
-  const saveCredentials = async () => {
-    if (!form.googleClientId) {
-      setMsg({ type: 'error', text: 'Client ID is required.' });
-      return;
-    }
-    if (!form.googleClientSecret && !appCreds?.hasClientSecret) {
-      setMsg({ type: 'error', text: 'Client Secret is required (not yet saved for this team).' });
-      return;
-    }
-    setSaving(true);
-    setMsg(null);
-    try {
-      // Send blank secret when keeping existing — backend handles the merge
-      const res = await api.put('/api/v1/integrations/app-credentials', {
-        googleClientId: form.googleClientId,
-        googleClientSecret: form.googleClientSecret || undefined,
-      });
-      setMsg({ type: 'success', text: 'Credentials saved. Make sure the Redirect URI above is registered in Google Cloud Console, then click Connect Gmail.' });
-      onRefresh();
-      setForm(f => ({ ...f, googleClientSecret: '' }));
-    } catch (e: any) {
-      setMsg({ type: 'error', text: e?.response?.data?.error || 'Failed to save credentials.' });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const connectGmail = async () => {
     setConnecting(true);
@@ -376,7 +337,7 @@ function GmailSection({ gmailStatus, appCreds, onRefresh }: {
       const res = await api.get('/api/v1/integrations/gmail/connect');
       window.location.href = res.data.url;
     } catch (e: any) {
-      setMsg({ type: 'error', text: e?.response?.data?.error || 'Could not start Gmail OAuth. Save credentials first.' });
+      setMsg({ type: 'error', text: e?.response?.data?.error || 'Could not start Gmail OAuth.' });
       setConnecting(false);
     }
   };
@@ -393,7 +354,6 @@ function GmailSection({ gmailStatus, appCreds, onRefresh }: {
   };
 
   const isConnected = gmailStatus?.isActive;
-  const hasCreds = !!(appCreds?.googleClientId);
 
   return (
     <div style={S.card}>
@@ -404,7 +364,7 @@ function GmailSection({ gmailStatus, appCreds, onRefresh }: {
           </div>
           <div>
             <div style={S.sectionTitle}>Gmail</div>
-            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Google OAuth 2.0 — one Gmail account per team</div>
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Connect your Gmail account to sync emails</div>
           </div>
         </div>
         <StatusBadge active={!!isConnected} label={isConnected ? `Connected: ${gmailStatus?.config?.email || 'Gmail'}` : 'Not connected'} />
@@ -412,80 +372,23 @@ function GmailSection({ gmailStatus, appCreds, onRefresh }: {
 
       <div style={S.divider} />
 
-      {/* ── Redirect URI — must be registered in Google Cloud Console ── */}
-      <div style={{
-        background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px',
-        padding: '14px 16px', marginBottom: '20px',
-      }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: '#92400e', marginBottom: '8px' }}>
-          ⚠ Step 0 — Register this Redirect URI in Google Cloud Console first
-        </div>
-        <div style={{ fontSize: '11.5px', color: '#78350f', marginBottom: '10px', lineHeight: 1.6 }}>
-          Go to <strong>console.cloud.google.com → APIs &amp; Services → Credentials → your OAuth 2.0 Client →
-          Authorised redirect URIs</strong> and add the exact URI below. This must match character-for-character
-          or Google will show "Access blocked: Authorization Error".
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <code style={{
-            flex: 1, background: '#fff', border: '1px solid #fcd34d', borderRadius: '6px',
-            padding: '7px 12px', fontSize: '12.5px', color: '#1f2937', wordBreak: 'break-all',
-          }}>{redirectUri}</code>
-          <CopyButton text={redirectUri} />
-        </div>
+      {msg && <Alert type={msg.type} message={msg.text} />}
+
+      <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '16px' }}>
+        {isConnected
+          ? `Inbox is connected to ${gmailStatus?.config?.email}. Click Reconnect to switch accounts.`
+          : 'Click Connect Gmail to authorize access to your Gmail inbox.'}
       </div>
 
-      {/* Step 1: Google OAuth App credentials */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: hasCreds ? '#ecfdf5' : '#f3f4f6', color: hasCreds ? '#059669' : '#9ca3af', fontSize: '11px', fontWeight: 700 }}>1</span>
-          Paste your Google Cloud OAuth client credentials
-          {hasCreds && <StatusBadge active={true} label="Saved" />}
-        </div>
-        {msg && <Alert type={msg.type} message={msg.text} />}
-        <div style={S.inputGroup}>
-          <label style={S.label}>Client ID <span style={{ color: '#ef4444' }}>*</span></label>
-          <input style={S.input} value={form.googleClientId} onChange={e => setForm(f => ({ ...f, googleClientId: e.target.value }))} placeholder="xxxxxxx.apps.googleusercontent.com" />
-        </div>
-        <div style={S.inputGroup}>
-          <label style={S.label}>
-            Client Secret <span style={{ color: '#ef4444' }}>*</span>
-            {appCreds?.hasClientSecret && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#059669', fontWeight: 500 }}>✓ already saved — leave blank to keep</span>}
-          </label>
-          <PasswordInput
-            value={form.googleClientSecret}
-            onChange={v => setForm(f => ({ ...f, googleClientSecret: v }))}
-            placeholder={appCreds?.hasClientSecret ? '(leave blank to keep existing secret)' : 'GOCSPX-xxxxxxxx'}
-          />
-        </div>
-        <button style={S.btnPrimary} onClick={saveCredentials} disabled={saving}>
-          <Save size={14} />{saving ? 'Saving…' : 'Save Credentials'}
+      <div style={S.btnRow}>
+        <button style={S.btnPrimary} onClick={connectGmail} disabled={connecting}>
+          <Mail size={14} />{connecting ? 'Opening Google…' : isConnected ? 'Reconnect Gmail' : 'Connect Gmail'}
         </button>
-      </div>
-
-      <div style={S.divider} />
-
-      {/* Step 2: Connect Gmail account */}
-      <div>
-        <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: isConnected ? '#ecfdf5' : '#f3f4f6', color: isConnected ? '#059669' : '#9ca3af', fontSize: '11px', fontWeight: 700 }}>2</span>
-          Authorize the Gmail account for this team
-          {isConnected && gmailStatus?.config?.email && <StatusBadge active={true} label={gmailStatus.config.email} />}
-        </div>
-        <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '14px', marginLeft: '28px' }}>
-          {isConnected
-            ? `Inbox is connected to ${gmailStatus?.config?.email}. Click Reconnect to switch accounts.`
-            : 'After saving credentials and registering the redirect URI, click Connect Gmail.'}
-        </div>
-        <div style={S.btnRow}>
-          <button style={S.btnPrimary} onClick={connectGmail} disabled={connecting || !hasCreds}>
-            <Mail size={14} />{connecting ? 'Opening Google…' : isConnected ? 'Reconnect Gmail' : 'Connect Gmail'}
+        {isConnected && (
+          <button style={S.btnDanger} onClick={disconnectGmail}>
+            <Trash2 size={14} />Disconnect Gmail
           </button>
-          {isConnected && (
-            <button style={S.btnDanger} onClick={disconnectGmail}>
-              <Trash2 size={14} />Disconnect Gmail
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
@@ -613,7 +516,7 @@ export default function SettingsPage() {
               <>
                 {oauthMsg && <Alert type={oauthMsg.type} message={oauthMsg.text} />}
                 <WhatsAppSection status={waStatus} onRefresh={load} />
-                <GmailSection gmailStatus={gmailStatus} appCreds={appCreds} onRefresh={load} />
+                <GmailSection gmailStatus={gmailStatus} onRefresh={load} />
               </>
             )
           ) : (
