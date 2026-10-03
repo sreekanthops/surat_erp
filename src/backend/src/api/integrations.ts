@@ -340,7 +340,8 @@ integrationsRouter.delete('/gmail/disconnect', requireRole('OWNER', 'MANAGER', '
 integrationsRouter.post('/gmail/sync', async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
-    const maxResults = parseInt(String(req.query.max || '50'));
+    // max = total emails to fetch across all pages; default 200, hard cap 500
+    const maxResults = Math.min(parseInt(String(req.query.max || '200')), 500);
 
     const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL', isActive: true } });
     if (!cfg) return res.status(400).json({ error: 'Gmail not connected. Connect Gmail first.' });
@@ -365,15 +366,23 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2 });
 
-    // Fetch list of message IDs — inbox only
-    const listRes = await gmail.users.messages.list({
-      userId: 'me',
-      labelIds: ['INBOX'],
-      maxResults,
-      q: 'in:inbox',
-    });
+    // Paginate through Gmail inbox to collect up to maxResults message IDs
+    const ids: string[] = [];
+    let pageToken: string | undefined;
+    do {
+      const listRes = await gmail.users.messages.list({
+        userId: 'me',
+        labelIds: ['INBOX'],
+        maxResults: Math.min(maxResults - ids.length, 100), // Gmail page max is 100
+        q: 'in:inbox',
+        ...(pageToken ? { pageToken } : {}),
+      });
+      for (const m of listRes.data.messages || []) {
+        if (m.id) ids.push(m.id);
+      }
+      pageToken = listRes.data.nextPageToken ?? undefined;
+    } while (pageToken && ids.length < maxResults);
 
-    const ids = (listRes.data.messages || []).map((m: any) => m.id as string);
     if (ids.length === 0) return res.json({ synced: 0, total: 0 });
 
     // Check which message IDs are already stored
@@ -385,7 +394,7 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
     const newIds = ids.filter((id) => !existingIds.has(id));
 
     let synced = 0;
-    for (const msgId of newIds.slice(0, 30)) {
+    for (const msgId of newIds) {
       try {
         const detail = await gmail.users.messages.get({ userId: 'me', id: msgId, format: 'full' });
         const msg = detail.data;
