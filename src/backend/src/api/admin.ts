@@ -10,6 +10,133 @@ export const adminRouter = Router();
 adminRouter.use(requireRole('OWNER', 'SUPER_ADMIN'));
 
 // ─────────────────────────────────────────────
+// TENANT MANAGEMENT (SUPER_ADMIN only)
+// ─────────────────────────────────────────────
+
+// GET /api/v1/admin/tenants — list all tenants (SUPER_ADMIN only)
+adminRouter.get('/tenants', requireRole('SUPER_ADMIN'), async (_req, res, next) => {
+  try {
+    const tenants = await prisma.tenant.findMany({
+      select: {
+        id: true, name: true, gstin: true, city: true, state: true,
+        phone: true, email: true, plan: true, isActive: true,
+        planExpiresAt: true, createdAt: true,
+        _count: { select: { users: true } },
+        users: {
+          where: { role: 'OWNER' },
+          select: { id: true, name: true, phone: true, email: true, role: true, isActive: true, lastLoginAt: true },
+          take: 1,
+        },
+        integrationConfigs: {
+          select: { type: true, isActive: true, lastSyncAt: true, config: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // For each tenant, build a safe summary — strip tokens from config
+    const safe = tenants.map(t => ({
+      ...t,
+      integrationConfigs: t.integrationConfigs.map(cfg => ({
+        type: cfg.type,
+        isActive: cfg.isActive,
+        lastSyncAt: cfg.lastSyncAt,
+        email: (cfg.config as any)?.email ?? null,
+      })),
+    }));
+
+    return res.json({ data: safe });
+  } catch (err) { next(err); }
+});
+
+const createTenantSchema = z.object({
+  // Tenant details
+  companyName:  z.string().min(1),
+  gstin:        z.string().optional(),
+  city:         z.string().default('Surat'),
+  state:        z.string().default('Gujarat'),
+  phone:        z.string().optional(),
+  email:        z.string().email().optional(),
+  plan:         z.enum(['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE']).default('STARTER'),
+  planDays:     z.number().default(30),
+  // First OWNER user
+  ownerName:    z.string().min(1),
+  ownerPhone:   z.string().min(10),
+  ownerEmail:   z.string().email().optional(),
+  ownerPassword: z.string().min(6),
+});
+
+// POST /api/v1/admin/tenants — create a new client tenant + owner (SUPER_ADMIN only)
+adminRouter.post('/tenants', requireRole('SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const body = createTenantSchema.parse(req.body);
+
+    // Check phone uniqueness
+    const existing = await prisma.user.findUnique({ where: { phone: body.ownerPhone } });
+    if (existing) return res.status(409).json({ error: 'A user with this phone number already exists.' });
+
+    const planExpiresAt = new Date();
+    planExpiresAt.setDate(planExpiresAt.getDate() + body.planDays);
+
+    const passwordHash = await bcrypt.hash(body.ownerPassword, 10);
+
+    // Create tenant + owner in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          name:          body.companyName,
+          gstin:         body.gstin,
+          city:          body.city,
+          state:         body.state,
+          phone:         body.phone,
+          email:         body.email,
+          plan:          body.plan as any,
+          planExpiresAt,
+          isActive:      true,
+          settings:      {},
+        },
+      });
+
+      const owner = await tx.user.create({
+        data: {
+          tenantId:     tenant.id,
+          name:         body.ownerName,
+          phone:        body.ownerPhone,
+          email:        body.ownerEmail,
+          passwordHash,
+          role:         'OWNER',
+          isActive:     true,
+        },
+        select: { id: true, name: true, phone: true, email: true, role: true },
+      });
+
+      return { tenant, owner };
+    });
+
+    return res.status(201).json(result);
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/v1/admin/tenants/:id — toggle active / update plan (SUPER_ADMIN only)
+adminRouter.patch('/tenants/:id', requireRole('SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const schema = z.object({
+      isActive:      z.boolean().optional(),
+      plan:          z.enum(['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE']).optional(),
+      planDays:      z.number().optional(),
+    });
+    const body = schema.parse(req.body);
+    const data: any = {};
+    if (body.isActive !== undefined) data.isActive = body.isActive;
+    if (body.plan)     data.plan = body.plan;
+    if (body.planDays) { const d = new Date(); d.setDate(d.getDate() + body.planDays); data.planExpiresAt = d; }
+
+    await prisma.tenant.update({ where: { id: req.params.id }, data });
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────
 // GROUPS
 // ─────────────────────────────────────────────
 

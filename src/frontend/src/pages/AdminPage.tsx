@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   Users, Shield, Plus, Pencil, Trash2, ToggleLeft,
   ToggleRight, X, Check, ChevronDown, AlertCircle,
+  Building2, Mail, Phone, Calendar, CheckCircle, XCircle,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -599,11 +600,261 @@ function GroupsTab({ groups, allUsers, reload }: { groups: Group[]; allUsers: Ad
   );
 }
 
+// ─── Tenants Tab (SUPER_ADMIN only) ──────────────────────────────────────────
+
+interface TenantSummary {
+  id: string; name: string; gstin?: string; city?: string; state?: string;
+  phone?: string; email?: string; plan: string; isActive: boolean;
+  planExpiresAt?: string; createdAt: string;
+  _count: { users: number };
+  users: { id: string; name: string; phone: string; email?: string; lastLoginAt?: string }[];
+  integrationConfigs: { type: string; isActive: boolean; email?: string | null }[];
+}
+
+const PLAN_COLORS: Record<string, { bg: string; color: string }> = {
+  STARTER:    { bg: '#f3f4f6', color: '#374151' },
+  GROWTH:     { bg: '#dbeafe', color: '#1e40af' },
+  PRO:        { bg: '#ede9fe', color: '#5b21b6' },
+  ENTERPRISE: { bg: '#d1fae5', color: '#065f46' },
+};
+
+function TenantsTab() {
+  const [tenants, setTenants] = useState<TenantSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [form, setForm] = useState({
+    companyName: '', gstin: '', city: 'Surat', state: 'Gujarat',
+    phone: '', email: '', plan: 'STARTER', planDays: 30,
+    ownerName: '', ownerPhone: '', ownerEmail: '', ownerPassword: '',
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/v1/admin/tenants');
+      setTenants(res.data.data);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    setSaving(true); setMsg(null);
+    try {
+      await api.post('/api/v1/admin/tenants', { ...form, planDays: Number(form.planDays) });
+      setMsg({ type: 'success', text: `Client "${form.companyName}" created. Owner login: ${form.ownerPhone} / ${form.ownerPassword}` });
+      setShowCreate(false);
+      setForm({ companyName: '', gstin: '', city: 'Surat', state: 'Gujarat', phone: '', email: '', plan: 'STARTER', planDays: 30, ownerName: '', ownerPhone: '', ownerEmail: '', ownerPassword: '' });
+      load();
+    } catch (e: any) {
+      setMsg({ type: 'error', text: e?.response?.data?.error || 'Failed to create client.' });
+    } finally { setSaving(false); }
+  };
+
+  const toggleActive = async (t: TenantSummary) => {
+    if (!confirm(`${t.isActive ? 'Suspend' : 'Activate'} ${t.name}?`)) return;
+    try {
+      await api.patch(`/api/v1/admin/tenants/${t.id}`, { isActive: !t.isActive });
+      load();
+    } catch (e: any) { alert(e?.response?.data?.error || 'Failed.'); }
+  };
+
+  const inp: React.CSSProperties = {
+    width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #e4e7ef',
+    fontSize: '13px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+  };
+  const lbl: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' };
+
+  return (
+    <div>
+      {msg && (
+        <div style={{ marginBottom: '16px', padding: '12px 16px', borderRadius: '10px', background: msg.type === 'success' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`, fontSize: '13px', color: msg.type === 'success' ? '#15803d' : '#b91c1c', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          {msg.type === 'success' ? <CheckCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} /> : <XCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />}
+          <span style={{ wordBreak: 'break-all' }}>{msg.text}</span>
+          <button onClick={() => setMsg(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', flexShrink: 0 }}><X size={14} /></button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ fontSize: '14px', color: '#374151' }}><strong>{tenants.length}</strong> client{tenants.length !== 1 ? 's' : ''} registered</div>
+        <button onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <Plus size={14} /> New Client
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>Loading clients…</div>
+      ) : tenants.length === 0 ? (
+        <div style={{ padding: '48px', textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+          <Building2 size={32} color="#d1d5db" style={{ marginBottom: '12px' }} />
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>No clients yet</div>
+          <div style={{ fontSize: '13px' }}>Click "New Client" to onboard your first customer.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {tenants.map(t => {
+            const pc = PLAN_COLORS[t.plan] ?? PLAN_COLORS.STARTER;
+            const owner = t.users[0];
+            const gmail = t.integrationConfigs.find(c => c.type === 'GMAIL');
+            const whatsapp = t.integrationConfigs.find(c => c.type === 'WHATSAPP');
+            const expired = t.planExpiresAt ? new Date(t.planExpiresAt) < new Date() : false;
+            return (
+              <div key={t.id} style={{ background: '#fff', borderRadius: '12px', border: `1px solid ${t.isActive ? '#e5e7eb' : '#fecaca'}`, padding: '18px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: t.isActive ? '#ede9fe' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Building2 size={20} color={t.isActive ? '#5b5bd6' : '#ef4444'} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#111827' }}>{t.name}</span>
+                        <span style={{ ...pc, display: 'inline-block', borderRadius: '5px', padding: '1px 8px', fontSize: '11px', fontWeight: 700 }}>{t.plan}</span>
+                        {!t.isActive && <span style={{ display: 'inline-block', borderRadius: '5px', padding: '1px 8px', fontSize: '11px', fontWeight: 700, background: '#fee2e2', color: '#b91c1c' }}>SUSPENDED</span>}
+                        {expired && t.isActive && <span style={{ display: 'inline-block', borderRadius: '5px', padding: '1px 8px', fontSize: '11px', fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>EXPIRED</span>}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                        {t.city}{t.state ? `, ${t.state}` : ''} · {t._count.users} user{t._count.users !== 1 ? 's' : ''}
+                        {t.planExpiresAt && <> · Plan expires {new Date(t.planExpiresAt).toLocaleDateString()}</>}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleActive(t)}
+                    style={{ padding: '6px 14px', borderRadius: '7px', border: `1px solid ${t.isActive ? '#fecaca' : '#bbf7d0'}`, background: t.isActive ? '#fef2f2' : '#f0fdf4', color: t.isActive ? '#b91c1c' : '#15803d', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {t.isActive ? 'Suspend' : 'Activate'}
+                  </button>
+                </div>
+
+                {/* Owner + integrations row */}
+                <div style={{ display: 'flex', gap: '20px', marginTop: '14px', flexWrap: 'wrap', fontSize: '12.5px', color: '#4b5563' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Users size={13} color="#6b7280" />
+                    <span><strong>Owner:</strong> {owner ? `${owner.name} · ${owner.phone}` : '—'}</span>
+                    {owner?.lastLoginAt && <span style={{ color: '#9ca3af' }}>· Last login {new Date(owner.lastLoginAt).toLocaleDateString()}</span>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Mail size={13} color="#d97706" />
+                    <span>
+                      <strong>Gmail:</strong>{' '}
+                      {gmail?.isActive && gmail.email
+                        ? <span style={{ color: '#16a34a', fontWeight: 600 }}>{gmail.email} ✓</span>
+                        : <span style={{ color: '#9ca3af' }}>Not configured</span>}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Phone size={13} color="#16a34a" />
+                    <span>
+                      <strong>WhatsApp:</strong>{' '}
+                      {whatsapp?.isActive
+                        ? <span style={{ color: '#16a34a', fontWeight: 600 }}>Connected ✓</span>
+                        : <span style={{ color: '#9ca3af' }}>Not configured</span>}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create Client Modal */}
+      {showCreate && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowCreate(false); setMsg(null); } }}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '520px', padding: '28px', boxShadow: '0 20px 60px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>Onboard New Client</div>
+              <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={18} /></button>
+            </div>
+
+            {msg && (
+              <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '8px', background: msg.type === 'error' ? '#fef2f2' : '#f0fdf4', border: `1px solid ${msg.type === 'error' ? '#fecaca' : '#bbf7d0'}`, fontSize: '13px', color: msg.type === 'error' ? '#b91c1c' : '#15803d' }}>
+                {msg.text}
+              </div>
+            )}
+
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '12px' }}>Company Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={lbl}>Company Name *</label>
+                <input style={inp} value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} placeholder="Sharma Textiles Pvt Ltd" />
+              </div>
+              <div>
+                <label style={lbl}>City</label>
+                <input style={inp} value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="Surat" />
+              </div>
+              <div>
+                <label style={lbl}>State</label>
+                <input style={inp} value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} placeholder="Gujarat" />
+              </div>
+              <div>
+                <label style={lbl}>GSTIN</label>
+                <input style={inp} value={form.gstin} onChange={e => setForm(f => ({ ...f, gstin: e.target.value }))} placeholder="24AABCS1429B1ZB" />
+              </div>
+              <div>
+                <label style={lbl}>Company Phone</label>
+                <input style={inp} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" />
+              </div>
+              <div>
+                <label style={lbl}>Plan</label>
+                <select style={{ ...inp, cursor: 'pointer' }} value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value }))}>
+                  {['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE'].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Trial / Plan Days</label>
+                <input style={inp} type="number" min={1} value={form.planDays} onChange={e => setForm(f => ({ ...f, planDays: Number(e.target.value) }))} />
+              </div>
+            </div>
+
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '12px' }}>Owner Account</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={lbl}>Owner Name *</label>
+                <input style={inp} value={form.ownerName} onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))} placeholder="Ramesh Sharma" />
+              </div>
+              <div>
+                <label style={lbl}>Owner Phone (login) *</label>
+                <input style={inp} value={form.ownerPhone} onChange={e => setForm(f => ({ ...f, ownerPhone: e.target.value }))} placeholder="9876543210" />
+              </div>
+              <div>
+                <label style={lbl}>Owner Email</label>
+                <input style={inp} type="email" value={form.ownerEmail} onChange={e => setForm(f => ({ ...f, ownerEmail: e.target.value }))} placeholder="ramesh@sharma.com" />
+              </div>
+              <div>
+                <label style={lbl}>Password *</label>
+                <input style={inp} type="password" value={form.ownerPassword} onChange={e => setForm(f => ({ ...f, ownerPassword: e.target.value }))} placeholder="Min. 6 characters" />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
+              <button style={{ padding: '9px 18px', borderRadius: '8px', border: '1.5px solid #e4e7ef', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }} onClick={() => { setShowCreate(false); setMsg(null); }}>Cancel</button>
+              <button
+                style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', opacity: saving || !form.companyName || !form.ownerName || !form.ownerPhone || !form.ownerPassword ? 0.6 : 1 }}
+                onClick={handleCreate}
+                disabled={saving || !form.companyName || !form.ownerName || !form.ownerPhone || !form.ownerPassword}
+              >
+                {saving ? 'Creating…' : 'Create Client'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const { user } = useAuthStore();
-  const [tab, setTab] = useState<'users' | 'groups'>('users');
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const [tab, setTab] = useState<'users' | 'groups' | 'clients'>(() =>
+    user?.role === 'SUPER_ADMIN' ? 'clients' : 'users'
+  );
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -652,9 +903,13 @@ export default function AdminPage() {
     <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', maxWidth: '1100px' }}>
       {/* Header */}
       <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>Admin</h1>
+        <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
+          {isSuperAdmin ? 'TextileIQ Platform Admin' : 'Admin'}
+        </h1>
         <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
-          Manage users, roles, and groups for your organisation.
+          {isSuperAdmin
+            ? 'Manage client tenants, users, and groups across the platform.'
+            : 'Manage users, roles, and groups for your organisation.'}
         </p>
       </div>
 
@@ -677,6 +932,11 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: '#f1f5f9', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
+        {isSuperAdmin && (
+          <button style={TAB_STYLE(tab === 'clients')} onClick={() => setTab('clients')}>
+            <Building2 size={14} /> Clients
+          </button>
+        )}
         <button style={TAB_STYLE(tab === 'users')} onClick={() => setTab('users')}>
           <Users size={14} /> Users
         </button>
@@ -686,13 +946,19 @@ export default function AdminPage() {
       </div>
 
       {/* Content */}
-      {loadErr && <ErrorBanner message={loadErr} />}
-      {loading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Loading…</div>
-      ) : tab === 'users' ? (
-        <UsersTab users={users} groups={groups} reload={load} />
+      {tab === 'clients' ? (
+        <TenantsTab />
       ) : (
-        <GroupsTab groups={groups} allUsers={users} reload={load} />
+        <>
+          {loadErr && <ErrorBanner message={loadErr} />}
+          {loading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Loading…</div>
+          ) : tab === 'users' ? (
+            <UsersTab users={users} groups={groups} reload={load} />
+          ) : (
+            <GroupsTab groups={groups} allUsers={users} reload={load} />
+          )}
+        </>
       )}
     </div>
   );
