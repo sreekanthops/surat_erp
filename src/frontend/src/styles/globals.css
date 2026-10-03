@@ -618,3 +618,165 @@
     box-shadow: var(--shadow-md);
   }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE / MOBILE  (≤ 768px)
+   ════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ── Sidebar: off-canvas on mobile ── */
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 260px !important;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  /* Show the overlay when sidebar is open */
+  .mobile-overlay {
+    display: block !important;
+  }
+
+  /* Show hamburger button, hide date pill */
+  .hamburger-btn {
+    display: flex !important;
+  }
+
+  .topbar-date {
+    display: none !important;
+  }
+
+  /* Show the close button inside sidebar */
+  .sidebar-close-btn {
+    display: flex !important;
+  }
+
+  /* Main content takes full width when sidebar is hidden */
+  .sidebar ~ div {
+    margin-left: 0 !important;
+  }
+
+  /* ── Page padding ── */
+  .page,
+  [class*="page"] {
+    padding: 14px 12px !important;
+  }
+
+  /* ── Stat/summary card grids: 2 columns on mobile ── */
+  [style*="repeat(4,1fr)"],
+  [style*="repeat(4, 1fr)"],
+  [style*="repeat(3,1fr)"],
+  [style*="repeat(3, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* ── 2-column form grids: stack to 1 column ── */
+  [style*="1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Tables: horizontal scroll ── */
+  table {
+    min-width: 0 !important;
+  }
+
+  /* Wrap table in scrollable container if not already */
+  .table-card,
+  [class*="tableCard"],
+  [class*="table-card"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Modals: full width with margin ── */
+  .modal,
+  [class*="modal"],
+  [style*="width: '680px'"],
+  [style*="width: 680px"],
+  [style*="maxWidth: '680px'"],
+  [style*="maxWidth: '600px'"],
+  [style*="maxWidth: '520px'"],
+  [style*="maxWidth: '480px'"],
+  [style*="maxWidth: '460px'"],
+  [style*="maxWidth: '440px'"] {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px !important;
+  }
+
+  /* ── Flex toolbars: wrap ── */
+  [style*="display: 'flex'"],
+  [style*="display:flex"] {
+    flex-wrap: wrap;
+  }
+
+  /* ── Header/topbar sections ── */
+  header {
+    padding: 0 12px !important;
+  }
+}
+
+/* ── Medium screens (tablets 769–1024px): 2-col stat grids ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  [style*="repeat(4,1fr)"],
+  [style*="repeat(4, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MOBILE TABLE SCROLL WRAPPERS
+   Applied to all .table-card divs that wrap <table>
+   ════════════════════════════════════════════════════════════════ */
+
+/* Give every table-containing div overflow-x:auto on mobile */
+@media (max-width: 900px) {
+  div:has(> table) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SMALL PHONES (≤ 480px)
+   ════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  /* Single column for everything */
+  [style*="repeat(2,1fr)"],
+  [style*="repeat(2, 1fr)"],
+  [style*="repeat(4,1fr)"],
+  [style*="repeat(4, 1fr)"],
+  [style*="repeat(3,1fr)"],
+  [style*="repeat(3, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tighter padding on very small screens */
+  .page,
+  [class*="page"] {
+    padding: 10px 8px !important;
+  }
+
+  /* Tabs: scroll horizontally */
+  [style*="display: 'flex'"][style*="gap: '8px'"],
+  [style*="display: 'flex'"][style*="gap: '4px'"] {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+}
+
