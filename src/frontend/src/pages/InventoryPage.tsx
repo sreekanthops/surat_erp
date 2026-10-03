@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
 import * as XLSX from 'xlsx';
 import {
   Plus, Search, Pencil, Trash2, X, Package, DollarSign, AlertTriangle, ShoppingCart,
   ArrowDownToLine, ArrowUpFromLine, RotateCcw, History, BarChart2, Download, ChevronLeft, ChevronRight,
+  Warehouse, ArrowLeftRight, Upload, Clock,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -444,6 +445,511 @@ function ReturnModal({ product, returnType, onClose, onSaved }: { product: Produ
   );
 }
 
+// ─── P3 Types ─────────────────────────────────────────────────────────────────
+
+interface Godown { id: string; name: string; address?: string; isActive: boolean; }
+interface GodownStock { id: string; quantity: number; product: { id: string; name: string; code?: string; unit: string; category?: string; reorderLevel: number; saleRate?: number; purchaseRate?: number; }; godown: { id: string; name: string }; }
+interface AgingRow { id: string; name: string; code?: string; category?: string; unit: string; currentStock: number; purchaseRate: number; saleRate: number; stockValue: number; lastSaleDate: string | null; daysSinceLastSale: number | null; bucket: string; }
+
+// ─── Godown Tab ───────────────────────────────────────────────────────────────
+
+function GodownTab({ onInvalidate }: { onInvalidate: () => void }) {
+  const qc = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showAdd, setShowAdd]       = useState(false);
+  const [editGodown, setEditGodown] = useState<Godown | null>(null);
+  const [formName, setFormName]     = useState('');
+  const [formAddr, setFormAddr]     = useState('');
+  const [saving, setSaving]         = useState(false);
+
+  const { data: godownsData, isLoading } = useQuery({
+    queryKey: ['godowns'],
+    queryFn: () => api.get('/api/v1/inventory/godowns').then(r => r.data.data as Godown[]),
+  });
+  const godowns = godownsData ?? [];
+
+  const { data: stockData } = useQuery({
+    queryKey: ['godown-stock', selectedId],
+    queryFn: () => api.get(`/api/v1/inventory/godowns/${selectedId}/stock`).then(r => r.data),
+    enabled: !!selectedId,
+  });
+
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['godowns'] }); qc.invalidateQueries({ queryKey: ['godown-stock'] }); onInvalidate(); };
+
+  const saveGodown = async () => {
+    if (!formName.trim()) return;
+    setSaving(true);
+    try {
+      if (editGodown) {
+        await api.put(`/api/v1/inventory/godowns/${editGodown.id}`, { name: formName, address: formAddr || undefined });
+      } else {
+        await api.post('/api/v1/inventory/godowns', { name: formName, address: formAddr || undefined });
+      }
+      invalidate(); setShowAdd(false); setEditGodown(null); setFormName(''); setFormAddr('');
+    } catch (e: any) { alert(e?.response?.data?.error || 'Failed'); }
+    setSaving(false);
+  };
+
+  const deleteGodown = async (id: string) => {
+    if (!confirm('Delete this godown? Stock records will be preserved.')) return;
+    await api.delete(`/api/v1/inventory/godowns/${id}`);
+    invalidate();
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  const openEdit = (g: Godown) => { setEditGodown(g); setFormName(g.name); setFormAddr(g.address ?? ''); setShowAdd(true); };
+
+  const stockRows: GodownStock[] = stockData?.data ?? [];
+  const selectedGodown = godowns.find(g => g.id === selectedId);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '16px', minHeight: '400px' }}>
+      {/* Left: godown list */}
+      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4e7ef', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '.05em' }}>Godowns</span>
+          <button style={{ ...S.primaryBtn, padding: '4px 10px', fontSize: '12px' }} onClick={() => { setEditGodown(null); setFormName(''); setFormAddr(''); setShowAdd(true); }}><Plus size={12} /></button>
+        </div>
+        {isLoading ? <div style={{ padding: '20px', color: '#9ca3af', fontSize: '13px' }}>Loading…</div>
+          : godowns.length === 0 ? <div style={{ padding: '20px', color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}><Warehouse size={24} style={{ opacity: .3, marginBottom: '8px' }} /><div>No godowns yet</div></div>
+          : godowns.map(g => (
+            <div key={g.id} onClick={() => setSelectedId(g.id)} style={{ padding: '10px 14px', cursor: 'pointer', background: selectedId === g.id ? '#ede9fe' : 'transparent', borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: selectedId === g.id ? 700 : 500, color: selectedId === g.id ? '#5b5bd6' : '#1a2235' }}>{g.name}</div>
+                {g.address && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{g.address}</div>}
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={e => { e.stopPropagation(); openEdit(g); }} style={S.actionBtn('#5b5bd6', '#ede9fe')}><Pencil size={11} /></button>
+                <button onClick={e => { e.stopPropagation(); deleteGodown(g.id); }} style={S.actionBtn('#ef4444', '#fef2f2')}><Trash2 size={11} /></button>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      {/* Right: stock in selected godown */}
+      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4e7ef', overflow: 'hidden' }}>
+        {!selectedId ? (
+          <div style={{ padding: '60px', textAlign: 'center', color: '#9ca3af' }}><Warehouse size={32} style={{ opacity: .3, marginBottom: '12px' }} /><div>Select a godown to view its stock</div></div>
+        ) : (
+          <>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', fontWeight: 700, fontSize: '14px', color: '#1a2235' }}>{selectedGodown?.name} — Stock</div>
+            {stockRows.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>No stock recorded for this godown yet.<br/>Use Stock Inward with a godown to start tracking.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ ...S.table, minWidth: '600px' }}>
+                  <thead style={S.thead}><tr>
+                    {['Product', 'Category', 'Unit', 'Qty in Godown', 'Buy Rate', 'Value'].map(h => <th key={h} style={S.th}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {stockRows.map(r => {
+                      const qty = Number(r.quantity);
+                      const val = qty * Number(r.product.purchaseRate ?? 0);
+                      const fmt2 = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+                      return (
+                        <tr key={r.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={S.td}><div style={{ fontWeight: 600 }}>{r.product.name}</div>{r.product.code && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{r.product.code}</div>}</td>
+                          <td style={S.td}>{r.product.category ?? '—'}</td>
+                          <td style={S.td}>{r.product.unit}</td>
+                          <td style={S.td}><span style={{ fontWeight: 700, color: qty <= 0 ? '#dc2626' : '#059669' }}>{qty}</span></td>
+                          <td style={S.td}>{fmt2(Number(r.product.purchaseRate ?? 0))}</td>
+                          <td style={{ ...S.td, fontWeight: 600, color: '#7c3aed' }}>{fmt2(val)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Add/Edit Godown Modal */}
+      {showAdd && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => e.target === e.currentTarget && setShowAdd(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a2235', marginBottom: '16px' }}>{editGodown ? 'Edit Godown' : 'Add Godown'}</div>
+            <label style={S.label}>Name *</label>
+            <input style={{ ...S.input, marginBottom: '12px' }} placeholder="e.g. Main Warehouse" value={formName} onChange={e => setFormName(e.target.value)} />
+            <label style={S.label}>Address <span style={{ color: '#9ca3af', fontWeight: 400 }}>optional</span></label>
+            <input style={{ ...S.input, marginBottom: '16px' }} placeholder="e.g. Ring Road, Surat" value={formAddr} onChange={e => setFormAddr(e.target.value)} />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button style={S.cancelBtn} onClick={() => { setShowAdd(false); setEditGodown(null); }}>Cancel</button>
+              <button style={{ ...S.primaryBtn, opacity: saving || !formName.trim() ? .6 : 1 }} onClick={saveGodown} disabled={saving || !formName.trim()}>{saving ? 'Saving…' : editGodown ? 'Save' : 'Add'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Transfer Tab ─────────────────────────────────────────────────────────────
+
+function TransferTab({ onInvalidate }: { onInvalidate: () => void }) {
+  const [productId, setProductId]   = useState('');
+  const [fromId, setFromId]         = useState('');
+  const [toId, setToId]             = useState('');
+  const [qty, setQty]               = useState('');
+  const [notes, setNotes]           = useState('');
+  const [error, setError]           = useState('');
+  const [success, setSuccess]       = useState('');
+
+  const { data: godownsData } = useQuery({ queryKey: ['godowns'], queryFn: () => api.get('/api/v1/inventory/godowns').then(r => r.data.data as Godown[]) });
+  const { data: productsData } = useQuery({ queryKey: ['inventory-products-all'], queryFn: () => api.get('/api/v1/inventory/products', { params: { limit: 2000 } }).then(r => r.data.data) });
+  const { data: sbgData } = useQuery({ queryKey: ['stock-by-godown'], queryFn: () => api.get('/api/v1/inventory/stock-by-godown').then(r => r.data) });
+
+  const godowns = godownsData ?? [];
+  const products = (productsData ?? []).map((p: any) => ({ ...p, currentStock: Number(p.currentStock) }));
+  const stockRows: GodownStock[] = sbgData?.data ?? [];
+
+  // Available qty in selected fromGodown for selected product
+  const availableQty = useMemo(() => {
+    if (!productId || !fromId) return null;
+    const row = stockRows.find(r => r.product.id === productId && r.godown.id === fromId);
+    return row ? Number(row.quantity) : 0;
+  }, [productId, fromId, stockRows]);
+
+  const mutation = useMutation({
+    mutationFn: () => api.post('/api/v1/inventory/transfer', { productId, fromGodownId: fromId, toGodownId: toId, quantity: parseFloat(qty), notes: notes || undefined }),
+    onSuccess: () => {
+      setSuccess('Transfer recorded successfully');
+      setQty(''); setNotes(''); setError('');
+      onInvalidate();
+      setTimeout(() => setSuccess(''), 3000);
+    },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Transfer failed'),
+  });
+
+  const handleTransfer = () => {
+    if (!productId || !fromId || !toId || !qty) { setError('Fill all required fields'); return; }
+    if (fromId === toId) { setError('Source and destination must be different'); return; }
+    if (parseFloat(qty) <= 0) { setError('Enter a valid quantity'); return; }
+    setError(''); mutation.mutate();
+  };
+
+  const selectedProduct = products.find((p: any) => p.id === productId);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      {/* Transfer Form */}
+      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4e7ef', padding: '20px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: '#1a2235', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><ArrowLeftRight size={16} color="#5b5bd6" />Stock Transfer</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div>
+            <label style={S.label}>Product *</label>
+            <select style={{ ...S.input, cursor: 'pointer' }} value={productId} onChange={e => setProductId(e.target.value)}>
+              <option value="">Select product…</option>
+              {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}{p.code ? ` (${p.code})` : ''}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={S.label}>From Godown *</label>
+              <select style={{ ...S.input, cursor: 'pointer' }} value={fromId} onChange={e => setFromId(e.target.value)}>
+                <option value="">Select…</option>
+                {godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={S.label}>To Godown *</label>
+              <select style={{ ...S.input, cursor: 'pointer' }} value={toId} onChange={e => setToId(e.target.value)}>
+                <option value="">Select…</option>
+                {godowns.filter(g => g.id !== fromId).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style={S.label}>Quantity {selectedProduct ? `(${selectedProduct.unit})` : ''} *</label>
+            <input style={S.input} type="number" min="0.001" step="0.001" placeholder="0" value={qty} onChange={e => setQty(e.target.value)} />
+            {availableQty !== null && <div style={{ fontSize: '11.5px', color: '#6b7280', marginTop: '4px' }}>Available in source godown: <strong>{availableQty}</strong></div>}
+          </div>
+          <div>
+            <label style={S.label}>Notes <span style={{ color: '#9ca3af', fontWeight: 400 }}>optional</span></label>
+            <input style={S.input} placeholder="Reason for transfer…" value={notes} onChange={e => setNotes(e.target.value)} />
+          </div>
+          {error && <div style={{ color: '#dc2626', fontSize: '12.5px', background: '#fef2f2', padding: '8px 12px', borderRadius: '8px' }}>{error}</div>}
+          {success && <div style={{ color: '#059669', fontSize: '12.5px', background: '#ecfdf5', padding: '8px 12px', borderRadius: '8px' }}>{success}</div>}
+          <button style={{ ...S.primaryBtn, justifyContent: 'center', opacity: mutation.isPending ? .6 : 1 }} onClick={handleTransfer} disabled={mutation.isPending}>
+            <ArrowLeftRight size={14} />{mutation.isPending ? 'Transferring…' : 'Transfer Stock'}
+          </button>
+        </div>
+      </div>
+
+      {/* Stock distribution view */}
+      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4e7ef', padding: '20px', overflowY: 'auto', maxHeight: '500px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: '#1a2235', marginBottom: '12px' }}>Stock Distribution</div>
+        {godowns.length === 0 ? (
+          <div style={{ color: '#9ca3af', fontSize: '13px' }}>No godowns configured yet.</div>
+        ) : godowns.map(g => {
+          const rows = stockRows.filter(r => r.godown.id === g.id);
+          return (
+            <div key={g.id} style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#5b5bd6', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}><Warehouse size={12} />{g.name}</div>
+              {rows.length === 0 ? <div style={{ fontSize: '12px', color: '#9ca3af', paddingLeft: '18px' }}>No stock</div>
+                : rows.map(r => (
+                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', padding: '3px 0 3px 18px', borderBottom: '1px solid #f5f5f5' }}>
+                    <span style={{ color: '#374151' }}>{r.product.name}</span>
+                    <span style={{ fontWeight: 600, color: Number(r.quantity) > 0 ? '#059669' : '#dc2626' }}>{Number(r.quantity)} {r.product.unit}</span>
+                  </div>
+                ))
+              }
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Bulk Import Tab ─────────────────────────────────────────────────────────
+
+function BulkImportTab({ onInvalidate }: { onInvalidate: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<any[]>([]);
+  const [result, setResult] = useState<{ created: number; updated: number; errors: { row: number; error: string }[] } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState('');
+
+  const TEMPLATE_HEADERS = ['name', 'code', 'category', 'subcategory', 'unit', 'hsnCode', 'gstRate', 'purchaseRate', 'saleRate', 'currentStock', 'reorderLevel', 'maxStock'];
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      TEMPLATE_HEADERS,
+      ['Silk Dupatta', 'SKU-001', 'Fabric', 'Silk', 'METER', '5007', '5', '250', '400', '100', '20', '500'],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    XLSX.writeFile(wb, 'product-import-template.xlsx');
+  };
+
+  const handleFile = (file: File) => {
+    setError(''); setResult(null); setRows([]);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target?.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
+        if (data.length === 0) { setError('File is empty'); return; }
+        // Normalize keys to lowercase
+        const normalized = data.map((row: any) => {
+          const norm: any = {};
+          for (const k of Object.keys(row)) norm[k.toLowerCase().replace(/\s+/g, '')] = row[k];
+          // Parse numbers
+          ['gstrate', 'purchaserate', 'salerate', 'currentstock', 'reorderlevel', 'maxstock'].forEach(k => {
+            if (norm[k] !== '' && norm[k] !== undefined) norm[k] = parseFloat(norm[k]) || 0;
+          });
+          return {
+            name: norm.name || norm['productname'] || '',
+            code: norm.code || norm.sku || '',
+            category: norm.category || '',
+            subcategory: norm.subcategory || '',
+            unit: (norm.unit || 'METER').toUpperCase(),
+            hsnCode: norm.hsncode || '',
+            gstRate: norm.gstrate ?? 5,
+            purchaseRate: norm.purchaserate || undefined,
+            saleRate: norm.salerate || undefined,
+            currentStock: norm.currentstock ?? 0,
+            reorderLevel: norm.reorderlevel ?? 0,
+            maxStock: norm.maxstock || undefined,
+          };
+        });
+        setRows(normalized);
+      } catch (e) { setError('Failed to parse file. Use the template.'); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleImport = async () => {
+    if (rows.length === 0) return;
+    setImporting(true); setError('');
+    try {
+      const r = await api.post('/api/v1/inventory/bulk-import', { products: rows });
+      setResult(r.data);
+      if (r.data.created > 0 || r.data.updated > 0) onInvalidate();
+    } catch (e: any) { setError(e?.response?.data?.error || 'Import failed'); }
+    setImporting(false);
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      {/* Upload area */}
+      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4e7ef', padding: '24px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: '#1a2235', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}><Upload size={16} color="#5b5bd6" />Bulk Import Products</div>
+        <div style={{ fontSize: '12.5px', color: '#9ca3af', marginBottom: '20px' }}>Upload an Excel or CSV file to create/update multiple products at once. Products with matching Code/SKU will be updated; others will be created.</div>
+
+        <button style={{ ...S.secondaryBtn, marginBottom: '16px', width: '100%', justifyContent: 'center' }} onClick={downloadTemplate}>
+          <Download size={14} /> Download Template
+        </button>
+
+        <div
+          style={{ border: '2px dashed #e4e7ef', borderRadius: '10px', padding: '28px', textAlign: 'center', cursor: 'pointer', background: '#fafbff' }}
+          onClick={() => fileRef.current?.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+        >
+          <Upload size={24} color="#9ca3af" style={{ marginBottom: '8px' }} />
+          <div style={{ fontSize: '13px', color: '#6b7280', fontWeight: 600 }}>Click or drag file here</div>
+          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>Excel (.xlsx) or CSV</div>
+          <input ref={fileRef} type="file" accept=".xlsx,.csv,.xls" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+        </div>
+
+        {error && <div style={{ color: '#dc2626', fontSize: '12.5px', background: '#fef2f2', padding: '8px 12px', borderRadius: '8px', marginTop: '12px' }}>{error}</div>}
+
+        {rows.length > 0 && !result && (
+          <div style={{ marginTop: '14px' }}>
+            <div style={{ fontSize: '12.5px', color: '#059669', fontWeight: 600, marginBottom: '8px' }}>✓ {rows.length} rows ready to import</div>
+            <button style={{ ...S.primaryBtn, width: '100%', justifyContent: 'center', opacity: importing ? .6 : 1 }} onClick={handleImport} disabled={importing}>
+              <Upload size={14} />{importing ? 'Importing…' : `Import ${rows.length} Products`}
+            </button>
+          </div>
+        )}
+
+        {result && (
+          <div style={{ marginTop: '14px', background: '#ecfdf5', borderRadius: '10px', padding: '14px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#059669', marginBottom: '6px' }}>Import Complete</div>
+            <div style={{ fontSize: '12.5px', color: '#374151' }}>✅ Created: <strong>{result.created}</strong> &nbsp; 🔄 Updated: <strong>{result.updated}</strong></div>
+            {result.errors.length > 0 && (
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#dc2626' }}>
+                ⚠ {result.errors.length} errors:
+                {result.errors.slice(0, 5).map(e => <div key={e.row}>Row {e.row}: {e.error}</div>)}
+              </div>
+            )}
+            <button style={{ ...S.secondaryBtn, marginTop: '10px', fontSize: '12px' }} onClick={() => { setRows([]); setResult(null); }}>Import Another File</button>
+          </div>
+        )}
+      </div>
+
+      {/* Preview */}
+      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4e7ef', padding: '20px', overflowY: 'auto', maxHeight: '500px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: '#1a2235', marginBottom: '12px' }}>Preview</div>
+        {rows.length === 0 ? (
+          <div style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}><Package size={28} style={{ opacity: .3, marginBottom: '8px' }} /><div>Upload a file to preview</div></div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <thead><tr style={{ background: '#f8f9fc' }}>
+                {['Name', 'Code', 'Category', 'Unit', 'Buy Rate', 'Sell Rate', 'Stock'].map(h => <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700, color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase', borderBottom: '1px solid #e4e7ef' }}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {rows.slice(0, 20).map((r, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                    <td style={{ padding: '5px 10px', fontWeight: 600, color: r.name ? '#1a2235' : '#dc2626' }}>{r.name || '⚠ Missing'}</td>
+                    <td style={{ padding: '5px 10px', color: '#9ca3af' }}>{r.code || '—'}</td>
+                    <td style={{ padding: '5px 10px', color: '#6b7280' }}>{r.category || '—'}</td>
+                    <td style={{ padding: '5px 10px' }}>{r.unit}</td>
+                    <td style={{ padding: '5px 10px', color: '#6b7280' }}>{r.purchaseRate ?? '—'}</td>
+                    <td style={{ padding: '5px 10px', color: '#6b7280' }}>{r.saleRate ?? '—'}</td>
+                    <td style={{ padding: '5px 10px', fontWeight: 600 }}>{r.currentStock}</td>
+                  </tr>
+                ))}
+                {rows.length > 20 && <tr><td colSpan={7} style={{ padding: '6px 10px', color: '#9ca3af', fontSize: '12px' }}>…and {rows.length - 20} more rows</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Stock Aging Tab ──────────────────────────────────────────────────────────
+
+function AgingTab() {
+  const [bucket, setBucket] = useState<string>('all');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['stock-aging'],
+    queryFn: () => api.get('/api/v1/inventory/aging').then(r => r.data as { data: AgingRow[]; summary: Record<string, number> }),
+    staleTime: 60_000,
+  });
+
+  const rows = data?.data ?? [];
+  const summary = data?.summary ?? {};
+
+  const filteredRows = bucket === 'all' ? rows : rows.filter(r => r.bucket === bucket);
+
+  const BUCKETS = [
+    { key: 'all',       label: 'All',           color: '#374151', bg: '#f3f4f6' },
+    { key: '0_30',      label: '0–30 days',      color: '#059669', bg: '#ecfdf5' },
+    { key: '31_60',     label: '31–60 days',     color: '#2563eb', bg: '#eff6ff' },
+    { key: '61_90',     label: '61–90 days',     color: '#d97706', bg: '#fffbeb' },
+    { key: '91_180',    label: '91–180 days',    color: '#ea580c', bg: '#fff7ed' },
+    { key: 'over_180',  label: '180+ days',      color: '#dc2626', bg: '#fef2f2' },
+    { key: 'never_sold',label: 'Never Sold',     color: '#7c3aed', bg: '#f5f3ff' },
+  ];
+
+  const bucketColor = (b: string) => BUCKETS.find(x => x.key === b) ?? BUCKETS[0];
+
+  const exportAging = () => {
+    const ws = XLSX.utils.json_to_sheet(filteredRows.map(r => ({
+      'Product': r.name, 'Code': r.code ?? '', 'Category': r.category ?? '', 'Unit': r.unit,
+      'Current Stock': r.currentStock, 'Stock Value (₹)': r.stockValue,
+      'Last Sale Date': r.lastSaleDate ? new Date(r.lastSaleDate).toLocaleDateString('en-IN') : 'Never',
+      'Days Since Last Sale': r.daysSinceLastSale ?? 'Never',
+      'Aging Bucket': bucketColor(r.bucket).label,
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock Aging');
+    XLSX.writeFile(wb, `stock-aging-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const fmtCurr = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+
+  if (isLoading) return <div style={{ padding: '60px', textAlign: 'center', color: '#9ca3af' }}>Loading aging data…</div>;
+
+  return (
+    <div>
+      {/* Summary buckets */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+        {BUCKETS.map(b => {
+          const count = b.key === 'all' ? rows.length : (summary[b.key] ?? 0);
+          const active = bucket === b.key;
+          return (
+            <button key={b.key} onClick={() => setBucket(b.key)} style={{ padding: '8px 14px', borderRadius: '10px', border: `1.5px solid ${active ? b.color : '#e4e7ef'}`, background: active ? b.bg : '#fff', color: active ? b.color : '#6b7280', fontSize: '12.5px', fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontWeight: 800 }}>{count}</span> {b.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <button style={S.secondaryBtn} onClick={exportAging}><Download size={14} />Export</button>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ ...S.table, minWidth: '760px' }}>
+          <thead style={S.thead}><tr>
+            {['Product', 'Category', 'Stock', 'Stock Value', 'Last Sale', 'Days Idle', 'Bucket'].map(h => <th key={h} style={S.th}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {filteredRows.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>No products in this bucket</td></tr>
+            ) : filteredRows.map(r => {
+              const bc = bucketColor(r.bucket);
+              return (
+                <tr key={r.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={S.td}><div style={{ fontWeight: 600, color: '#1a2235' }}>{r.name}</div>{r.code && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{r.code}</div>}</td>
+                  <td style={S.td}>{r.category ?? '—'}</td>
+                  <td style={S.td}><span style={{ fontWeight: 700, color: r.currentStock === 0 ? '#dc2626' : '#059669' }}>{r.currentStock} {r.unit}</span></td>
+                  <td style={{ ...S.td, fontWeight: 600, color: '#7c3aed' }}>{fmtCurr(r.stockValue)}</td>
+                  <td style={S.td}>{r.lastSaleDate ? new Date(r.lastSaleDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : <span style={{ color: '#9ca3af' }}>Never</span>}</td>
+                  <td style={S.td}><span style={{ fontWeight: 700, color: bc.color }}>{r.daysSinceLastSale ?? '—'}</span></td>
+                  <td style={S.td}><span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: bc.bg, color: bc.color }}>{bc.label}</span></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Valuation Tab ────────────────────────────────────────────────────────────
 
 function ValuationTab() {
@@ -572,7 +1078,7 @@ export default function InventoryPage() {
   const qc = useQueryClient();
 
   // Tabs
-  const [tab, setTab] = useState<'products' | 'valuation'>('products');
+  const [tab, setTab] = useState<'products' | 'valuation' | 'godowns' | 'transfer' | 'import' | 'aging'>('products');
 
   // Filters + pagination
   const [search, setSearch] = useState('');
@@ -723,14 +1229,34 @@ export default function InventoryPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
           <button style={S.tab(tab === 'products')} onClick={() => setTab('products')}>Products</button>
-          <button style={S.tab(tab === 'valuation')} onClick={() => setTab('valuation')}><BarChart2 size={13} style={{ display: 'inline', marginRight: '4px' }} />Valuation Report</button>
+          <button style={S.tab(tab === 'valuation')} onClick={() => setTab('valuation')}><BarChart2 size={13} style={{ display: 'inline', marginRight: '4px' }} />Valuation</button>
+          <button style={S.tab(tab === 'godowns')} onClick={() => setTab('godowns')}><Warehouse size={13} style={{ display: 'inline', marginRight: '4px' }} />Godowns</button>
+          <button style={S.tab(tab === 'transfer')} onClick={() => setTab('transfer')}><ArrowLeftRight size={13} style={{ display: 'inline', marginRight: '4px' }} />Transfer</button>
+          <button style={S.tab(tab === 'import')} onClick={() => setTab('import')}><Upload size={13} style={{ display: 'inline', marginRight: '4px' }} />Bulk Import</button>
+          <button style={S.tab(tab === 'aging')} onClick={() => setTab('aging')}><Clock size={13} style={{ display: 'inline', marginRight: '4px' }} />Stock Aging</button>
         </div>
 
         {tab === 'valuation' ? (
           <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e4e7ef', padding: '20px', boxShadow: '0 1px 4px rgba(17,24,39,.04)' }}>
             <ValuationTab />
+          </div>
+        ) : tab === 'godowns' ? (
+          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e4e7ef', padding: '20px', boxShadow: '0 1px 4px rgba(17,24,39,.04)' }}>
+            <GodownTab onInvalidate={() => qc.invalidateQueries({ queryKey: ['products'] })} />
+          </div>
+        ) : tab === 'transfer' ? (
+          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e4e7ef', padding: '20px', boxShadow: '0 1px 4px rgba(17,24,39,.04)' }}>
+            <TransferTab onInvalidate={() => qc.invalidateQueries({ queryKey: ['products'] })} />
+          </div>
+        ) : tab === 'import' ? (
+          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e4e7ef', padding: '20px', boxShadow: '0 1px 4px rgba(17,24,39,.04)' }}>
+            <BulkImportTab onInvalidate={() => qc.invalidateQueries({ queryKey: ['products'] })} />
+          </div>
+        ) : tab === 'aging' ? (
+          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e4e7ef', padding: '20px', boxShadow: '0 1px 4px rgba(17,24,39,.04)' }}>
+            <AgingTab />
           </div>
         ) : (
           <>
