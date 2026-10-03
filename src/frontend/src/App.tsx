@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Component, ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
@@ -14,6 +15,21 @@ import ChatbotPage from '@/pages/ChatbotPage';
 import SettingsPage from '@/pages/SettingsPage';
 import AdminPage from '@/pages/AdminPage';
 
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) { return { error: e.message }; }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'sans-serif' }}>
+        <h2 style={{ color: '#ef4444' }}>Something went wrong</h2>
+        <pre style={{ color: '#6b7280', fontSize: '13px', marginTop: '12px' }}>{this.state.error}</pre>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '20px', padding: '8px 20px', cursor: 'pointer' }}>Reload</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const token = useAuthStore((s) => s.token);
   return token ? <>{children}</> : <Navigate to="/login" replace />;
@@ -27,6 +43,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
@@ -52,5 +69,6 @@ export default function App() {
         <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
     </Routes>
+    </ErrorBoundary>
   );
 }

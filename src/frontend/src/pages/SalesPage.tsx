@@ -791,13 +791,13 @@ export default function SalesPage() {
 
   const partiesQuery = useQuery({
     queryKey: ['parties-customers'],
-    queryFn: () => api.get('/api/v1/parties', { params: { type: 'CUSTOMER' } }).then(r => r.data as Party[]),
+    queryFn: () => api.get('/api/v1/parties', { params: { type: 'CUSTOMER', limit: 500 } }).then(r => (r.data?.data ?? r.data) as Party[]),
     enabled: showCreate,
   });
 
   const productsQuery = useQuery({
     queryKey: ['products-for-invoice'],
-    queryFn: () => api.get('/api/v1/inventory/products').then(r => r.data as Product[]),
+    queryFn: () => api.get('/api/v1/inventory/products', { params: { limit: 500 } }).then(r => (r.data?.data ?? r.data) as Product[]),
     enabled: showCreate,
   });
 
