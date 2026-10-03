@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import api from '@/hooks/useApi';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   RefreshCw, Mail, MailOpen, Search, Send, X,
   ExternalLink, AlertCircle, CheckCircle, Loader,
-  Inbox, Unlink, Plus,
+  Inbox, Unlink, Plus, Lock,
 } from 'lucide-react';
 
 interface GmailMsg {
@@ -149,7 +150,7 @@ function EmailRow({ msg, active, onClick }: { msg: GmailMsg; active: boolean; on
 }
 
 // ── Email Reader ──────────────────────────────────────────────────────────────
-function EmailReader({ msg, onClose, onReply }: { msg: GmailMsg; onClose: () => void; onReply: (body: string) => void }) {
+function EmailReader({ msg, onClose, onReply, canReply }: { msg: GmailMsg; onClose: () => void; onReply: (body: string) => void; canReply?: boolean }) {
   const [reply, setReply] = useState('');
   const [showReply, setShowReply] = useState(false);
   const from = msg.party?.name || msg.fromAddress || 'Unknown';
@@ -210,8 +211,8 @@ function EmailReader({ msg, onClose, onReply }: { msg: GmailMsg; onClose: () => 
         </pre>
       </div>
 
-      {/* Reply composer */}
-      <div style={{ borderTop: '1px solid #e4e7ef', background: '#fff', flexShrink: 0 }}>
+      {/* Reply composer — manager+ only */}
+      {canReply !== false && <div style={{ borderTop: '1px solid #e4e7ef', background: '#fff', flexShrink: 0 }}>
         {!showReply ? (
           <div style={{ padding: '12px 20px' }}>
             <button
@@ -271,13 +272,14 @@ function EmailReader({ msg, onClose, onReply }: { msg: GmailMsg; onClose: () => 
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function GmailPage() {
+  const { canConfigureIntegrations } = usePermissions();
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
@@ -449,20 +451,22 @@ export default function GmailPage() {
 
         {gmailStatus.isActive && (
           <>
-            {/* Compose Button */}
-            <button
-              onClick={() => setShowCompose(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-                borderRadius: '9px', border: 'none', cursor: 'pointer',
-                background: '#5b5bd6', color: '#fff', fontSize: '13px', fontWeight: 700,
-                fontFamily: 'inherit',
-              }}
-            >
-              <Plus size={14} /> Compose Email
-            </button>
+            {/* Compose — manager+ only */}
+            {canConfigureIntegrations && (
+              <button
+                onClick={() => setShowCompose(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                  borderRadius: '9px', border: 'none', cursor: 'pointer',
+                  background: '#5b5bd6', color: '#fff', fontSize: '13px', fontWeight: 700,
+                  fontFamily: 'inherit',
+                }}
+              >
+                <Plus size={14} /> Compose Email
+              </button>
+            )}
 
-            {/* Unread filter */}
+            {/* Unread filter — all roles */}
             <button
               onClick={() => setUnreadOnly(v => !v)}
               style={{
@@ -477,33 +481,37 @@ export default function GmailPage() {
               <Inbox size={13} /> Unread only
             </button>
 
-            {/* Sync */}
-            <button
-              onClick={() => syncMut.mutate()}
-              disabled={syncMut.isPending}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-                borderRadius: '9px', border: '1.5px solid #e4e7ef', cursor: syncMut.isPending ? 'not-allowed' : 'pointer',
-                background: '#fff', color: '#374151', fontSize: '13px', fontWeight: 600,
-                fontFamily: 'inherit', opacity: syncMut.isPending ? 0.7 : 1,
-              }}
-            >
-              <RefreshCw size={13} style={{ animation: syncMut.isPending ? 'spin 1s linear infinite' : 'none' }} />
-              {syncMut.isPending ? 'Syncing…' : 'Sync'}
-            </button>
+            {/* Sync — manager+ only */}
+            {canConfigureIntegrations && (
+              <button
+                onClick={() => syncMut.mutate()}
+                disabled={syncMut.isPending}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                  borderRadius: '9px', border: '1.5px solid #e4e7ef', cursor: syncMut.isPending ? 'not-allowed' : 'pointer',
+                  background: '#fff', color: '#374151', fontSize: '13px', fontWeight: 600,
+                  fontFamily: 'inherit', opacity: syncMut.isPending ? 0.7 : 1,
+                }}
+              >
+                <RefreshCw size={13} style={{ animation: syncMut.isPending ? 'spin 1s linear infinite' : 'none' }} />
+                {syncMut.isPending ? 'Syncing…' : 'Sync'}
+              </button>
+            )}
 
-            {/* Disconnect */}
-            <button
-              onClick={() => disconnectMut.mutate()}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 12px',
-                borderRadius: '9px', border: '1.5px solid #fecaca',
-                background: '#fff', color: '#dc2626', fontSize: '12.5px', fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              <Unlink size={12} /> Disconnect
-            </button>
+            {/* Disconnect — manager+ only */}
+            {canConfigureIntegrations && (
+              <button
+                onClick={() => disconnectMut.mutate()}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 12px',
+                  borderRadius: '9px', border: '1.5px solid #fecaca',
+                  background: '#fff', color: '#dc2626', fontSize: '12.5px', fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <Unlink size={12} /> Disconnect
+              </button>
+            )}
           </>
         )}
       </div>
@@ -529,7 +537,30 @@ export default function GmailPage() {
       {/* ── Content ── */}
       {!gmailStatus.isActive ? (
         <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
-          <ConnectBanner onConnect={handleConnect} loading={connectLoading} />
+          {canConfigureIntegrations
+            ? <ConnectBanner onConnect={handleConnect} loading={connectLoading} />
+            : (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '80px 24px', textAlign: 'center', gap: '16px',
+              }}>
+                <div style={{
+                  width: '64px', height: '64px', borderRadius: '18px',
+                  background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Lock size={28} color="#9ca3af" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#374151', margin: '0 0 6px' }}>
+                    Gmail not connected
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#6b7280', margin: 0, maxWidth: '320px', lineHeight: 1.6 }}>
+                    Ask your Owner or Manager to connect a Gmail account for this workspace.
+                  </p>
+                </div>
+              </div>
+            )
+          }
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
@@ -623,6 +654,7 @@ export default function GmailPage() {
                 msg={selected}
                 onClose={() => setSelected(null)}
                 onReply={(body) => replyMut.mutate({ body })}
+                canReply={canConfigureIntegrations}
               />
             </div>
           )}
