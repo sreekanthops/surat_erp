@@ -781,7 +781,8 @@ export default function SalesPage() {
   const [toDate, setToDate]     = useState(monthEnd);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
-  const [page] = useState(1);
+  const [page, setPage]   = useState(1);
+  const [limit, setLimit] = useState(50);
 
   // ── Modals
   const [showCreate, setShowCreate] = useState(false);
@@ -790,10 +791,10 @@ export default function SalesPage() {
 
   // ── Queries
   const invoicesQuery = useQuery({
-    queryKey: ['invoices', fromDate, toDate, statusFilter, page],
+    queryKey: ['invoices', fromDate, toDate, statusFilter, page, limit],
     queryFn: () =>
       api.get('/api/v1/sales/invoices', {
-        params: { from: fromDate || undefined, to: toDate || undefined, status: statusFilter || undefined, page, limit: 20 },
+        params: { from: fromDate || undefined, to: toDate || undefined, status: statusFilter || undefined, page, limit },
       }).then(r => r.data as { data: Invoice[]; total: number }),
   });
 
@@ -965,19 +966,19 @@ export default function SalesPage() {
         }}>
           <div>
             <Label>From</Label>
-            <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+            <Input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1); }}
               style={{ width: '150px' }} />
           </div>
           <div>
             <Label>To</Label>
-            <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+            <Input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPage(1); }}
               style={{ width: '150px' }} />
           </div>
           <div>
             <Label>Status</Label>
             <Select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
+              onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
               style={{ width: '140px' }}
             >
               <option value="">All</option>
@@ -1172,6 +1173,86 @@ export default function SalesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* ── Pagination */}
+          {total > 0 && (() => {
+            const totalPages = Math.ceil(total / limit);
+            const start = (page - 1) * limit + 1;
+            const end   = Math.min(page * limit, total);
+            // build page numbers: always show first, last, current ±2
+            const pages: (number | '…')[] = [];
+            for (let i = 1; i <= totalPages; i++) {
+              if (i === 1 || i === totalPages || (i >= page - 2 && i <= page + 2)) pages.push(i);
+              else if (pages[pages.length - 1] !== '…') pages.push('…');
+            }
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 20px', borderTop: '1px solid #e4e7ef', flexWrap: 'wrap', gap: '12px',
+              }}>
+                {/* Left: info + per-page */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '12.5px', color: '#6b7280' }}>
+                    Showing <strong>{start}–{end}</strong> of <strong>{total}</strong> invoices
+                  </span>
+                  <select
+                    value={limit}
+                    onChange={e => { setLimit(Number(e.target.value)); setPage(1); }}
+                    style={{
+                      padding: '5px 10px', borderRadius: '8px', border: '1px solid #e4e7ef',
+                      fontSize: '12.5px', color: '#374151', background: '#fff', cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {[20, 50, 100, 500].map(n => <option key={n} value={n}>{n} / page</option>)}
+                  </select>
+                </div>
+
+                {/* Right: page buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                    style={{
+                      padding: '5px 12px', borderRadius: '8px', border: '1px solid #e4e7ef',
+                      background: page === 1 ? '#f9fafb' : '#fff', color: page === 1 ? '#d1d5db' : '#374151',
+                      fontSize: '12.5px', cursor: page === 1 ? 'default' : 'pointer', fontFamily: 'inherit',
+                    }}
+                  >← Prev</button>
+
+                  {pages.map((p, i) =>
+                    p === '…' ? (
+                      <span key={`e${i}`} style={{ padding: '5px 6px', fontSize: '12.5px', color: '#9ca3af' }}>…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p as number)}
+                        style={{
+                          padding: '5px 10px', borderRadius: '8px', border: '1px solid',
+                          borderColor: p === page ? '#5b5bd6' : '#e4e7ef',
+                          background: p === page ? '#5b5bd6' : '#fff',
+                          color: p === page ? '#fff' : '#374151',
+                          fontSize: '12.5px', fontWeight: p === page ? 700 : 400,
+                          cursor: 'pointer', fontFamily: 'inherit', minWidth: '32px',
+                        }}
+                      >{p}</button>
+                    )
+                  )}
+
+                  <button
+                    disabled={page === totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                    style={{
+                      padding: '5px 12px', borderRadius: '8px', border: '1px solid #e4e7ef',
+                      background: page === totalPages ? '#f9fafb' : '#fff',
+                      color: page === totalPages ? '#d1d5db' : '#374151',
+                      fontSize: '12.5px', cursor: page === totalPages ? 'default' : 'pointer', fontFamily: 'inherit',
+                    }}
+                  >Next →</button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
