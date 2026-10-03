@@ -206,6 +206,53 @@ salesRouter.patch('/invoices/:id/payment', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/v1/sales/stats — aggregates for the stat cards (respects date range)
+salesRouter.get('/stats', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
+    const { from, to } = req.query as Record<string, string>;
+
+    // Default: current month
+    const now = new Date();
+    const fromDate = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const toDate   = to   ? new Date(to)   : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const where = {
+      tenantId, ...gf,
+      type: 'SALE' as const,
+      date: { gte: fromDate, lte: toDate },
+    };
+
+    const [totals, pending, paid] = await Promise.all([
+      prisma.transaction.aggregate({ where, _sum: { totalAmount: true }, _count: true }),
+      prisma.transaction.aggregate({
+        where: { ...where, status: { in: ['PENDING', 'PARTIAL'] } },
+        _sum: { totalAmount: true, paidAmount: true },
+      }),
+      prisma.transaction.aggregate({
+        where: { ...where },
+        _sum: { paidAmount: true },
+      }),
+    ]);
+
+    const totalSales   = Number(totals._sum.totalAmount  || 0);
+    const pendingAmt   = Number(pending._sum.totalAmount || 0) - Number(pending._sum.paidAmount || 0);
+    const paidAmt      = Number(paid._sum.paidAmount     || 0);
+
+    return res.json({
+      totalSales,
+      totalInvoices: totals._count,
+      pendingAmount: pendingAmt,
+      paidAmount:    paidAmt,
+      fromDate:      fromDate.toISOString(),
+      toDate:        toDate.toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/v1/sales/analytics
 salesRouter.get('/analytics', async (req, res, next) => {
   try {

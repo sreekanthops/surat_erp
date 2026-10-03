@@ -765,12 +765,20 @@ function RecordPaymentModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// Default date range: current month
+const monthStart = () => {
+  const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0];
+};
+const monthEnd = () => {
+  const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(0); return d.toISOString().split('T')[0];
+};
+
 export default function SalesPage() {
   const qc = useQueryClient();
 
-  // ── Filters
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  // ── Filters — default to current month
+  const [fromDate, setFromDate] = useState(monthStart);
+  const [toDate, setToDate]     = useState(monthEnd);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [page] = useState(1);
@@ -787,6 +795,15 @@ export default function SalesPage() {
       api.get('/api/v1/sales/invoices', {
         params: { from: fromDate || undefined, to: toDate || undefined, status: statusFilter || undefined, page, limit: 20 },
       }).then(r => r.data as { data: Invoice[]; total: number }),
+  });
+
+  const statsQuery = useQuery({
+    queryKey: ['invoices-stats', fromDate, toDate],
+    queryFn: () =>
+      api.get('/api/v1/sales/stats', {
+        params: { from: fromDate || undefined, to: toDate || undefined },
+      }).then(r => r.data as { totalSales: number; totalInvoices: number; pendingAmount: number; paidAmount: number }),
+    staleTime: 30_000,
   });
 
   const partiesQuery = useQuery({
@@ -820,27 +837,24 @@ export default function SalesPage() {
     );
   }, [invoices, search]);
 
-  // ── Stats
-  const thisMonthTotal = filtered.reduce((s, inv) => s + inv.totalAmount, 0);
-  const pendingAmt = filtered.filter(i => i.status === 'PENDING' || i.status === 'PARTIAL')
-    .reduce((s, i) => s + (i.totalAmount - i.paidAmount), 0);
-  const paidAmt = filtered.reduce((s, i) => s + i.paidAmount, 0);
-
+  // ── Stats — from backend aggregate (correct for date range, not just current page)
+  const stats = statsQuery.data;
   const statCards = [
     {
-      label: 'This Month Sales', value: fmt(thisMonthTotal),
+      label: fromDate === monthStart() && toDate === monthEnd() ? 'This Month Sales' : 'Period Sales',
+      value: stats ? fmt(stats.totalSales) : '—',
       icon: TrendingUp, gradient: 'linear-gradient(135deg, #5b5bd6 0%, #7c3aed 100%)', shadow: 'rgba(91,91,214,0.4)',
     },
     {
-      label: 'Total Invoices', value: String(total),
+      label: 'Total Invoices', value: stats ? String(stats.totalInvoices) : String(total),
       icon: FileText, gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', shadow: 'rgba(16,185,129,0.4)',
     },
     {
-      label: 'Pending Amount', value: fmt(pendingAmt),
+      label: 'Pending Amount', value: stats ? fmt(stats.pendingAmount) : '—',
       icon: Clock, gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', shadow: 'rgba(245,158,11,0.4)',
     },
     {
-      label: 'Paid Amount', value: fmt(paidAmt),
+      label: 'Paid Amount', value: stats ? fmt(stats.paidAmount) : '—',
       icon: CheckCircle, gradient: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', shadow: 'rgba(34,197,94,0.4)',
     },
   ];
@@ -873,7 +887,7 @@ export default function SalesPage() {
               Sales & Invoices
             </h1>
             <p style={{ fontSize: '13px', color: '#9ca3af', marginTop: '3px' }}>
-              {currentMonth} · <strong style={{ color: '#5b5bd6', fontWeight: 700 }}>{fmt(thisMonthTotal)}</strong> in sales
+              {fromDate && toDate ? `${fromDate} → ${toDate}` : currentMonth} · <strong style={{ color: '#5b5bd6', fontWeight: 700 }}>{stats ? fmt(stats.totalSales) : '—'}</strong> in sales
             </p>
           </div>
           <button
