@@ -44,7 +44,7 @@ const PERMISSIONS: Record<string, number> = {
 
   // ── Integrations ───────────────────────────────────────────
   'integrations:view':       ROLE_RANK.MANAGER,      // see connection status
-  'integrations:configure':  ROLE_RANK.OWNER,        // connect / disconnect / change credentials
+  'integrations:configure':  ROLE_RANK.MANAGER,      // connect / disconnect / change credentials (OWNER + MANAGER)
 
   // ── Users ──────────────────────────────────────────────────
   'users:view':              ROLE_RANK.MANAGER,

@@ -159,6 +159,7 @@ function PasswordInput({ value, onChange, placeholder }: { value: string; onChan
 // ── WhatsApp Section ──────────────────────────────────────────────────────────
 
 function WhatsAppSection({ status, onRefresh }: { status: WaStatus | null; onRefresh: () => void }) {
+  const { canConfigureIntegrations } = usePermissions();
   const [form, setForm] = useState({
     displayPhone: '', phoneNumberId: '', wabaId: '',
     accessToken: '', appSecret: '', verifyToken: '',
@@ -240,68 +241,81 @@ function WhatsAppSection({ status, onRefresh }: { status: WaStatus | null; onRef
       )}
 
       <div style={S.divider} />
-      <div style={{ ...S.sectionDesc, marginBottom: '16px' }}>
-        Enter your Meta Cloud API credentials below. These are stored securely in the database and used only for this team's account.
-        Get them from <strong>developers.facebook.com → Your App → WhatsApp → API Setup</strong>.
-      </div>
 
-      {msg && <Alert type={msg.type} message={msg.text} />}
-
-      <div style={S.row}>
-        <div style={S.inputGroup}>
-          <label style={S.label}>Display Phone Number</label>
-          <input style={S.input} value={form.displayPhone} onChange={e => setForm(f => ({ ...f, displayPhone: e.target.value }))} placeholder="+91 87900 07228" />
+      {!canConfigureIntegrations ? (
+        // Read-only view for STAFF / ACCOUNTANT / READONLY
+        <div style={{ fontSize: '13px', color: '#6b7280', lineHeight: 1.6 }}>
+          {isConnected
+            ? <>WhatsApp is connected to <strong style={{ color: '#111827' }}>{status?.config?.displayPhone || 'your team number'}</strong>. Messages are synced automatically.</>
+            : 'WhatsApp has not been configured yet. Contact your Owner or Manager to connect a WhatsApp Business account.'}
         </div>
-        <div style={S.inputGroup}>
-          <label style={S.label}>Phone Number ID <span style={{ color: '#ef4444' }}>*</span></label>
-          <input style={S.input} value={form.phoneNumberId} onChange={e => setForm(f => ({ ...f, phoneNumberId: e.target.value }))} placeholder="123456789012345" />
-        </div>
-      </div>
-      <div style={S.inputGroup}>
-        <label style={S.label}>WhatsApp Business Account ID (WABA ID) <span style={{ color: '#ef4444' }}>*</span></label>
-        <input style={S.input} value={form.wabaId} onChange={e => setForm(f => ({ ...f, wabaId: e.target.value }))} placeholder="987654321098765" />
-      </div>
-      <div style={S.inputGroup}>
-        <label style={S.label}>Access Token <span style={{ color: '#ef4444' }}>*</span></label>
-        <PasswordInput value={form.accessToken} onChange={v => setForm(f => ({ ...f, accessToken: v }))} placeholder="EAAxxxxxxxx — permanent system user token" />
-      </div>
-      <div style={S.row}>
-        <div style={S.inputGroup}>
-          <label style={S.label}>App Secret</label>
-          <PasswordInput value={form.appSecret} onChange={v => setForm(f => ({ ...f, appSecret: v }))} placeholder="Meta App Secret (for webhook sig)" />
-        </div>
-        <div style={S.inputGroup}>
-          <label style={S.label}>Webhook Verify Token</label>
-          <input style={S.input} value={form.verifyToken} onChange={e => setForm(f => ({ ...f, verifyToken: e.target.value }))} placeholder="gspaces-wa-token" />
-        </div>
-      </div>
-
-      <div style={S.btnRow}>
-        <button style={S.btnPrimary} onClick={save} disabled={saving}>
-          <Save size={14} />{saving ? 'Saving…' : 'Save & Connect'}
-        </button>
-        {isConnected && (
-          <button style={S.btnDanger} onClick={disconnect}>
-            <Trash2 size={14} />Disconnect
-          </button>
-        )}
-      </div>
-
-      {isConnected && (
+      ) : (
+        // Configure view — OWNER + MANAGER only
         <>
-          <div style={S.divider} />
-          <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '10px' }}>Send Test Message</div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <input
-              style={{ ...S.input, maxWidth: '260px' }}
-              value={testPhone}
-              onChange={e => setTestPhone(e.target.value)}
-              placeholder="91XXXXXXXXXX (with country code)"
-            />
-            <button style={S.btnGhost} onClick={test} disabled={testing}>
-              <RefreshCw size={13} />{testing ? 'Sending…' : 'Send Test'}
-            </button>
+          <div style={{ ...S.sectionDesc, marginBottom: '16px' }}>
+            Enter your Meta Cloud API credentials below. These are stored securely in the database and used only for this team's account.
+            Get them from <strong>developers.facebook.com → Your App → WhatsApp → API Setup</strong>.
           </div>
+
+          {msg && <Alert type={msg.type} message={msg.text} />}
+
+          <div style={S.row}>
+            <div style={S.inputGroup}>
+              <label style={S.label}>Display Phone Number</label>
+              <input style={S.input} value={form.displayPhone} onChange={e => setForm(f => ({ ...f, displayPhone: e.target.value }))} placeholder="+91 87900 07228" />
+            </div>
+            <div style={S.inputGroup}>
+              <label style={S.label}>Phone Number ID <span style={{ color: '#ef4444' }}>*</span></label>
+              <input style={S.input} value={form.phoneNumberId} onChange={e => setForm(f => ({ ...f, phoneNumberId: e.target.value }))} placeholder="123456789012345" />
+            </div>
+          </div>
+          <div style={S.inputGroup}>
+            <label style={S.label}>WhatsApp Business Account ID (WABA ID) <span style={{ color: '#ef4444' }}>*</span></label>
+            <input style={S.input} value={form.wabaId} onChange={e => setForm(f => ({ ...f, wabaId: e.target.value }))} placeholder="987654321098765" />
+          </div>
+          <div style={S.inputGroup}>
+            <label style={S.label}>Access Token <span style={{ color: '#ef4444' }}>*</span></label>
+            <PasswordInput value={form.accessToken} onChange={v => setForm(f => ({ ...f, accessToken: v }))} placeholder="EAAxxxxxxxx — permanent system user token" />
+          </div>
+          <div style={S.row}>
+            <div style={S.inputGroup}>
+              <label style={S.label}>App Secret</label>
+              <PasswordInput value={form.appSecret} onChange={v => setForm(f => ({ ...f, appSecret: v }))} placeholder="Meta App Secret (for webhook sig)" />
+            </div>
+            <div style={S.inputGroup}>
+              <label style={S.label}>Webhook Verify Token</label>
+              <input style={S.input} value={form.verifyToken} onChange={e => setForm(f => ({ ...f, verifyToken: e.target.value }))} placeholder="gspaces-wa-token" />
+            </div>
+          </div>
+
+          <div style={S.btnRow}>
+            <button style={S.btnPrimary} onClick={save} disabled={saving}>
+              <Save size={14} />{saving ? 'Saving…' : 'Save & Connect'}
+            </button>
+            {isConnected && (
+              <button style={S.btnDanger} onClick={disconnect}>
+                <Trash2 size={14} />Disconnect
+              </button>
+            )}
+          </div>
+
+          {isConnected && (
+            <>
+              <div style={S.divider} />
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '10px' }}>Send Test Message</div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  style={{ ...S.input, maxWidth: '260px' }}
+                  value={testPhone}
+                  onChange={e => setTestPhone(e.target.value)}
+                  placeholder="91XXXXXXXXXX (with country code)"
+                />
+                <button style={S.btnGhost} onClick={test} disabled={testing}>
+                  <RefreshCw size={13} />{testing ? 'Sending…' : 'Send Test'}
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -329,6 +343,7 @@ function GmailSection({ gmailStatus, onRefresh }: {
   gmailStatus: GmailStatus | null;
   onRefresh: () => void;
 }) {
+  const { canConfigureIntegrations } = usePermissions();
   const [connecting, setConnecting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
@@ -366,32 +381,54 @@ function GmailSection({ gmailStatus, onRefresh }: {
           </div>
           <div>
             <div style={S.sectionTitle}>Gmail</div>
-            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Connect your Gmail account to sync emails</div>
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+              {canConfigureIntegrations
+                ? 'Connect your team Gmail to sync emails for all members'
+                : 'Gmail inbox for this team'}
+            </div>
           </div>
         </div>
-        <StatusBadge active={!!isConnected} label={isConnected ? `Connected: ${gmailStatus?.config?.email || 'Gmail'}` : 'Not connected'} />
+        <StatusBadge
+          active={!!isConnected}
+          label={isConnected
+            ? `Connected${gmailStatus?.config?.email ? `: ${gmailStatus.config.email}` : ''}`
+            : 'Not configured'}
+        />
       </div>
 
       <div style={S.divider} />
 
       {msg && <Alert type={msg.type} message={msg.text} />}
 
-      <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '16px' }}>
-        {isConnected
-          ? `Inbox is connected to ${gmailStatus?.config?.email}. Click Reconnect to switch accounts.`
-          : 'Click Connect Gmail to authorize access to your Gmail inbox.'}
-      </div>
+      {/* Read-only status for non-configurators */}
+      {!canConfigureIntegrations && (
+        <div style={{ fontSize: '13px', color: '#6b7280', lineHeight: 1.6 }}>
+          {isConnected
+            ? <>Gmail is connected to <strong style={{ color: '#111827' }}>{gmailStatus?.config?.email || 'your team account'}</strong>. Emails are synced automatically.</>
+            : 'Gmail has not been configured yet. Contact your Owner or Manager to connect a Gmail account.'}
+        </div>
+      )}
 
-      <div style={S.btnRow}>
-        <button style={S.btnPrimary} onClick={connectGmail} disabled={connecting}>
-          <Mail size={14} />{connecting ? 'Opening Google…' : isConnected ? 'Reconnect Gmail' : 'Connect Gmail'}
-        </button>
-        {isConnected && (
-          <button style={S.btnDanger} onClick={disconnectGmail}>
-            <Trash2 size={14} />Disconnect Gmail
-          </button>
-        )}
-      </div>
+      {/* Configure buttons — OWNER + MANAGER only */}
+      {canConfigureIntegrations && (
+        <>
+          <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '16px' }}>
+            {isConnected
+              ? `Inbox is connected to ${gmailStatus?.config?.email}. All team members can see synced emails. Click Reconnect to switch accounts.`
+              : 'Connect your Gmail account. Once connected, all team members in this group will see synced emails.'}
+          </div>
+          <div style={S.btnRow}>
+            <button style={S.btnPrimary} onClick={connectGmail} disabled={connecting}>
+              <Mail size={14} />{connecting ? 'Opening Google…' : isConnected ? 'Reconnect Gmail' : 'Connect Gmail'}
+            </button>
+            {isConnected && (
+              <button style={S.btnDanger} onClick={disconnectGmail}>
+                <Trash2 size={14} />Disconnect Gmail
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
