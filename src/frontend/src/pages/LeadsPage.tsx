@@ -567,7 +567,10 @@ export default function LeadsPage() {
     staleTime: 30_000,
   });
 
-  const leads: Lead[] = data?.data ?? [];
+  const leads: Lead[] = (data?.data ?? []).map((l: any) => ({
+    ...l,
+    estimatedValue: l.estimatedValue != null ? Number(l.estimatedValue) : undefined,
+  }));
 
   // Pipeline summary — always fetch all leads for counts
   const { data: allData } = useQuery<LeadsResponse>({
@@ -575,7 +578,10 @@ export default function LeadsPage() {
     queryFn: () => api.get('/api/v1/leads', { params: { page: 1, limit: 1000 } }).then((r) => r.data),
     staleTime: 60_000,
   });
-  const allLeads: Lead[] = allData?.data ?? [];
+  const allLeads: Lead[] = (allData?.data ?? []).map((l: any) => ({
+    ...l,
+    estimatedValue: l.estimatedValue != null ? Number(l.estimatedValue) : undefined,
+  }));
 
   const summary = STATUSES.map((s) => {
     const group = allLeads.filter((l) => l.status === s);

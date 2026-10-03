@@ -460,7 +460,13 @@ export default function InventoryPage() {
     staleTime: 60_000,
   });
 
-  const products: Product[] = productsQuery.data?.data ?? [];
+  const products: Product[] = (productsQuery.data?.data ?? []).map((p: any) => ({
+    ...p,
+    currentStock:  Number(p.currentStock),
+    saleRate:      p.saleRate     != null ? Number(p.saleRate)     : undefined,
+    purchaseRate:  p.purchaseRate != null ? Number(p.purchaseRate) : undefined,
+    reorderLevel:  Number(p.reorderLevel ?? 0),
+  }));
   const summary: StockSummary = summaryQuery.data ?? {};
 
   // Derive unique categories for filter

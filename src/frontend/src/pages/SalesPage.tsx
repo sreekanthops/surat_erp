@@ -804,7 +804,11 @@ export default function SalesPage() {
   const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ['invoices'] }), [qc]);
 
   // ── Derived data
-  const invoices: Invoice[] = invoicesQuery.data?.data ?? [];
+  const invoices: Invoice[] = (invoicesQuery.data?.data ?? []).map((inv: any) => ({
+    ...inv,
+    totalAmount: Number(inv.totalAmount),
+    paidAmount:  Number(inv.paidAmount),
+  }));
   const total: number = invoicesQuery.data?.total ?? 0;
 
   const filtered = useMemo(() => {
