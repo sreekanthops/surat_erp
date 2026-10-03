@@ -19,6 +19,7 @@ import { leadsRouter } from './api/leads.js';
 import { aiRouter } from './api/ai.js';
 import { reportsRouter } from './api/reports.js';
 import { integrationsRouter, gmailCallbackRouter } from './api/integrations.js';
+import { usersRouter } from './api/users.js';
 import { whatsappRouter } from './api/whatsapp.js';
 import { whatsappWebhookRouter } from './integrations/whatsapp/webhook.js';
 import { gmailWebhookRouter } from './integrations/gmail/webhook.js';
@@ -90,6 +91,7 @@ app.use('/api/v1/leads', leadsRouter);
 app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/integrations', integrationsRouter);
+app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/admin', adminRouter);
 
 // ── Health Check ──────────────────────────────────────────

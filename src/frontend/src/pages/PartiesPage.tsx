@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   Users, Search, Plus, Edit2, Trash2, X, ChevronDown,
   TrendingUp, TrendingDown, UserCheck, Building2,
@@ -533,6 +534,7 @@ const DeleteModal = ({ party, onClose, onConfirm, deleting }: DeleteModalProps) 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PartiesPage() {
+  const { canWriteParties, canDeleteParties } = usePermissions();
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabFilter>('ALL');
   const [search, setSearch] = useState('');
@@ -663,37 +665,39 @@ export default function PartiesPage() {
           </div>
         </div>
 
-        <button
-          onClick={openAdd}
-          style={{
-            height: '42px',
-            padding: '0 20px',
-            borderRadius: '12px',
-            border: 'none',
-            background: 'linear-gradient(135deg, #5b5bd6 0%, #4646b5 100%)',
-            color: '#fff',
-            fontSize: '14px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(99,102,241,0.35)',
-            transition: 'transform 0.15s, box-shadow 0.15s',
-            flexShrink: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.45)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(99,102,241,0.35)';
-          }}
-        >
-          <Plus size={16} />
-          Add Party
-        </button>
+        {canWriteParties && (
+          <button
+            onClick={openAdd}
+            style={{
+              height: '42px',
+              padding: '0 20px',
+              borderRadius: '12px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #5b5bd6 0%, #4646b5 100%)',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(99,102,241,0.35)',
+              transition: 'transform 0.15s, box-shadow 0.15s',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.45)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(99,102,241,0.35)';
+            }}
+          >
+            <Plus size={16} />
+            Add Party
+          </button>
+        )}
       </div>
 
       {/* ── Summary Cards ─────────────────────────────────────────────────── */}
@@ -881,32 +885,36 @@ export default function PartiesPage() {
                       {/* Actions */}
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                          <button
-                            className="action-btn"
-                            onClick={() => openEdit(party)}
-                            title="Edit"
-                            style={{
-                              width: '32px', height: '32px', borderRadius: '8px',
-                              border: '1.5px solid #e4e7ef', background: '#fff',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            <Edit2 size={14} color="#4646b5" />
-                          </button>
-                          <button
-                            className="action-btn"
-                            onClick={() => setDeleteParty(party)}
-                            title="Delete"
-                            style={{
-                              width: '32px', height: '32px', borderRadius: '8px',
-                              border: '1.5px solid #fee2e2', background: '#fff',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            <Trash2 size={14} color="#ef4444" />
-                          </button>
+                          {canWriteParties && (
+                            <button
+                              className="action-btn"
+                              onClick={() => openEdit(party)}
+                              title="Edit"
+                              style={{
+                                width: '32px', height: '32px', borderRadius: '8px',
+                                border: '1.5px solid #e4e7ef', background: '#fff',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <Edit2 size={14} color="#4646b5" />
+                            </button>
+                          )}
+                          {canDeleteParties && (
+                            <button
+                              className="action-btn"
+                              onClick={() => setDeleteParty(party)}
+                              title="Delete"
+                              style={{
+                                width: '32px', height: '32px', borderRadius: '8px',
+                                border: '1.5px solid #fee2e2', background: '#fff',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <Trash2 size={14} color="#ef4444" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

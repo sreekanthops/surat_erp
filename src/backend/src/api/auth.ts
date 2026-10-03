@@ -55,6 +55,24 @@ authRouter.post('/login', async (req, res, next) => {
   }
 });
 
+// GET /api/v1/auth/me
+authRouter.get('/me', async (req, res, next) => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, name: true, phone: true, email: true, role: true, isActive: true,
+        tenant: { select: { id: true, name: true, plan: true, isActive: true } },
+        group:  { select: { id: true, name: true } },
+      },
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    return res.json(user);
+  } catch (err) { next(err); }
+});
+
 // POST /api/v1/auth/refresh
 authRouter.post('/refresh', async (req, res, next) => {
   try {

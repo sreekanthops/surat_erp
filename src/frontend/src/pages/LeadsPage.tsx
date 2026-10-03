@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   Plus, Search, X, ChevronDown, Pencil, Trash2, AlertTriangle,
   TrendingUp, Phone, MapPin, Calendar, MoreHorizontal,
@@ -552,6 +553,7 @@ function DeleteModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
+  const { canWriteLeads, canDeleteLeads } = usePermissions();
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [addModal, setAddModal] = useState(false);
@@ -616,15 +618,17 @@ export default function LeadsPage() {
           <h1 style={S.h1}>Leads & Pipeline</h1>
           <p style={S.sub}>Sales pipeline</p>
         </div>
-        <button
-          style={S.addBtn}
-          onClick={() => setAddModal(true)}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 20px rgba(99,102,241,0.5)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(99,102,241,0.4)'; }}
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          Add Lead
-        </button>
+        {canWriteLeads && (
+          <button
+            style={S.addBtn}
+            onClick={() => setAddModal(true)}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 20px rgba(99,102,241,0.5)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(99,102,241,0.4)'; }}
+          >
+            <Plus size={15} strokeWidth={2.5} />
+            Add Lead
+          </button>
+        )}
       </div>
 
       {/* ── Pipeline Summary ── */}
@@ -767,24 +771,28 @@ export default function LeadsPage() {
                     {/* Actions */}
                     <td style={{ ...S.td, whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        <button
-                          title="Edit lead"
-                          style={S.actionBtn()}
-                          onClick={() => setEditLead(lead)}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f5f6fa'}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          title="Delete lead"
-                          style={S.actionBtn(true)}
-                          onClick={() => setDeleteLead(lead)}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fef2f2'}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {canWriteLeads && (
+                          <button
+                            title="Edit lead"
+                            style={S.actionBtn()}
+                            onClick={() => setEditLead(lead)}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f5f6fa'}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        {canDeleteLeads && (
+                          <button
+                            title="Delete lead"
+                            style={S.actionBtn(true)}
+                            onClick={() => setDeleteLead(lead)}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fef2f2'}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

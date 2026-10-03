@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Settings, MessageSquare, Mail, Shield, User, CheckCircle,
   XCircle, AlertCircle, Eye, EyeOff, RefreshCw, Trash2, Save,
+  Users, Plus, Pencil, UserCheck, UserX,
 } from 'lucide-react';
 import api from '@/hooks/useApi';
 import { useAuthStore } from '@/store/authStore';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -439,8 +441,227 @@ function AccessDenied() {
       </div>
       <div style={{ fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>Access Restricted</div>
       <div style={{ fontSize: '13px', color: '#9ca3af', maxWidth: '320px', margin: '0 auto', lineHeight: 1.6 }}>
-        Only the team <strong>Owner</strong> or <strong>Manager</strong> can configure integrations. Contact your admin to update credentials.
+        Only the team <strong>Owner</strong> or <strong>Manager</strong> can access this section.
       </div>
+    </div>
+  );
+}
+
+// ── Team / User Management Section ───────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  OWNER: 'Owner', MANAGER: 'Manager', ACCOUNTANT: 'Accountant',
+  STAFF: 'Staff', READONLY: 'Read-only',
+};
+const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
+  OWNER:      { bg: '#ede9fe', color: '#5b21b6' },
+  MANAGER:    { bg: '#dbeafe', color: '#1e40af' },
+  ACCOUNTANT: { bg: '#d1fae5', color: '#065f46' },
+  STAFF:      { bg: '#fef3c7', color: '#92400e' },
+  READONLY:   { bg: '#f3f4f6', color: '#374151' },
+};
+
+interface TeamUser {
+  id: string; name: string; phone: string; email?: string;
+  role: string; isActive: boolean; lastLoginAt?: string | null;
+  group?: { id: string; name: string } | null;
+}
+
+function TeamSection({ callerRole }: { callerRole: string }) {
+  const { canWriteUsers, canDeleteUsers, isOwnerOrAbove } = usePermissions();
+  const [users, setUsers] = useState<TeamUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editUser, setEditUser] = useState<TeamUser | null>(null);
+  const [form, setForm] = useState({ name: '', phone: '', email: '', password: '', role: 'STAFF' });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/v1/users');
+      setUsers(res.data.data);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openAdd = () => { setEditUser(null); setForm({ name: '', phone: '', email: '', password: '', role: 'STAFF' }); setShowAdd(true); };
+  const openEdit = (u: TeamUser) => {
+    setEditUser(u);
+    setForm({ name: u.name, phone: u.phone ?? '', email: u.email ?? '', password: '', role: u.role });
+    setShowAdd(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true); setMsg(null);
+    try {
+      if (editUser) {
+        const payload: any = { name: form.name, email: form.email || undefined, role: form.role };
+        if (form.password) payload.password = form.password;
+        await api.put(`/api/v1/users/${editUser.id}`, payload);
+      } else {
+        await api.post('/api/v1/users', form);
+      }
+      setMsg({ type: 'success', text: editUser ? 'User updated.' : 'User created successfully.' });
+      setShowAdd(false); setEditUser(null);
+      load();
+    } catch (e: any) {
+      setMsg({ type: 'error', text: e?.response?.data?.error || 'Save failed.' });
+    } finally { setSaving(false); }
+  };
+
+  const handleDeactivate = async (u: TeamUser) => {
+    if (!confirm(`${u.isActive ? 'Deactivate' : 'Reactivate'} ${u.name}?`)) return;
+    try {
+      await api.put(`/api/v1/users/${u.id}`, { isActive: !u.isActive });
+      load();
+    } catch (e: any) { alert(e?.response?.data?.error || 'Failed.'); }
+  };
+
+  const ASSIGNABLE_ROLES = isOwnerOrAbove
+    ? ['MANAGER', 'ACCOUNTANT', 'STAFF', 'READONLY']
+    : ['ACCOUNTANT', 'STAFF', 'READONLY'];
+
+  const iBtn = (bg: string, color: string) => ({
+    padding: '5px 8px', borderRadius: '7px', border: `1px solid ${bg}`,
+    background: bg, color, cursor: 'pointer', display: 'flex', alignItems: 'center',
+    fontSize: '12px', fontFamily: 'inherit', gap: '4px',
+  });
+
+  return (
+    <div>
+      {msg && <Alert type={msg.type} message={msg.text} />}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>Team Members</div>
+        {canWriteUsers && (
+          <button onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#5b5bd6', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Plus size={14} /> Add Member
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ color: '#9ca3af', fontSize: '13px', padding: '16px 0' }}>Loading team…</div>
+      ) : (
+        <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#f7f8fa' }}>
+                {['Name', 'Phone', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '1px solid #e5e7eb', fontSize: '12px' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => {
+                const rc = ROLE_COLORS[u.role] ?? ROLE_COLORS.STAFF;
+                const isOwner = u.role === 'OWNER';
+                return (
+                  <tr key={u.id} style={{ borderBottom: '1px solid #f0f1f5' }}>
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ fontWeight: 600, color: '#1f2328' }}>{u.name}</div>
+                      {u.email && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{u.email}</div>}
+                    </td>
+                    <td style={{ padding: '10px 14px', color: '#4b5563' }}>{u.phone}</td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{ ...rc, display: 'inline-block', borderRadius: '5px', padding: '2px 8px', fontSize: '11.5px', fontWeight: 700 }}>
+                        {ROLE_LABELS[u.role] ?? u.role}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: u.isActive ? '#16a34a' : '#9ca3af' }}>
+                        {u.isActive ? <UserCheck size={13} /> : <UserX size={13} />}
+                        {u.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 14px', color: '#6b7280', fontSize: '12px' }}>
+                      {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : '—'}
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      {!isOwner && (
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {canWriteUsers && (
+                            <button style={iBtn('#ede9fe', '#5b21b6')} onClick={() => openEdit(u)} title="Edit">
+                              <Pencil size={12} />
+                            </button>
+                          )}
+                          {canDeleteUsers && (
+                            <button
+                              style={iBtn(u.isActive ? '#fef2f2' : '#f0fdf4', u.isActive ? '#ef4444' : '#16a34a')}
+                              onClick={() => handleDeactivate(u)}
+                              title={u.isActive ? 'Deactivate' : 'Reactivate'}
+                            >
+                              {u.isActive ? <UserX size={12} /> : <UserCheck size={12} />}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
+      {showAdd && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowAdd(false); setMsg(null); } }}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '28px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>{editUser ? 'Edit Member' : 'Add Team Member'}</div>
+            </div>
+            {msg && <Alert type={msg.type} message={msg.text} />}
+            <div style={{ display: 'grid', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Full Name *</label>
+                <input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Rajesh Kumar" />
+              </div>
+              {!editUser && (
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Phone (used to login) *</label>
+                  <input style={S.input} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
+                </div>
+              )}
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Email</label>
+                <input style={S.input} type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="rajesh@company.com" />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>{editUser ? 'New Password (leave blank to keep)' : 'Password *'}</label>
+                <input style={S.input} type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min. 6 characters" />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Role *</label>
+                <select style={{ ...S.input, cursor: 'pointer' }} value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                  {ASSIGNABLE_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                  {form.role === 'MANAGER' && 'Can add/edit/delete most data. Cannot change integrations.'}
+                  {form.role === 'ACCOUNTANT' && 'Can record payments and view reports. Cannot add/delete products or parties.'}
+                  {form.role === 'STAFF' && 'Can create invoices, add parties, record stock. Cannot delete.'}
+                  {form.role === 'READONLY' && 'Can only view data. Cannot create or modify anything.'}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button style={{ padding: '8px 18px', borderRadius: '8px', border: '1.5px solid #e4e7ef', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }} onClick={() => { setShowAdd(false); setMsg(null); }}>Cancel</button>
+              <button
+                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#5b5bd6', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', opacity: saving || !form.name.trim() || (!editUser && !form.phone.trim()) || (!editUser && !form.password) ? 0.6 : 1 }}
+                onClick={handleSave}
+                disabled={saving || !form.name.trim() || (!editUser && !form.phone.trim()) || (!editUser && !form.password)}
+              >
+                {saving ? 'Saving…' : editUser ? 'Save Changes' : 'Create Member'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -449,14 +670,13 @@ function AccessDenied() {
 
 export default function SettingsPage() {
   const user = useAuthStore(s => s.user);
-  const [tab, setTab] = useState<'integrations' | 'profile'>('integrations');
+  const { canViewIntegrations, canConfigureIntegrations, canViewUsers } = usePermissions();
+  const [tab, setTab] = useState<'integrations' | 'profile' | 'team'>('integrations');
   const [waStatus, setWaStatus] = useState<WaStatus | null>(null);
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null);
   const [appCreds, setAppCreds] = useState<AppCreds | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthMsg, setOauthMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const isAdmin = user?.role === 'OWNER' || user?.role === 'MANAGER' || user?.role === 'SUPER_ADMIN';
 
   // Handle Gmail OAuth redirect result (?connected=1 or ?error=...)
   useEffect(() => {
@@ -473,7 +693,7 @@ export default function SettingsPage() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!canViewIntegrations) return;
     setLoading(true);
     try {
       const [statusRes, credsRes] = await Promise.all([
@@ -488,7 +708,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [canViewIntegrations]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -499,17 +719,18 @@ export default function SettingsPage() {
           <Settings size={20} color="#111827" />
           <h1 style={S.heading}>Settings</h1>
         </div>
-        <p style={S.subheading}>Configure integrations and view your account — credentials are stored per team, not in .env</p>
+        <p style={S.subheading}>Manage integrations, team members, and your account profile</p>
       </div>
 
       <div style={S.tabs}>
-        <Tab label="Integrations" active={tab === 'integrations'} onClick={() => setTab('integrations')} />
+        {canViewIntegrations && <Tab label="Integrations" active={tab === 'integrations'} onClick={() => setTab('integrations')} />}
+        {canViewUsers && <Tab label="Team" active={tab === 'team'} onClick={() => setTab('team')} />}
         <Tab label="Profile" active={tab === 'profile'} onClick={() => setTab('profile')} />
       </div>
 
       <div style={{ maxWidth: '720px' }}>
         {tab === 'integrations' && (
-          isAdmin ? (
+          canViewIntegrations ? (
             loading ? (
               <div style={{ color: '#9ca3af', fontSize: '13px', padding: '24px 0' }}>Loading integration status…</div>
             ) : (
@@ -522,6 +743,10 @@ export default function SettingsPage() {
           ) : (
             <AccessDenied />
           )
+        )}
+
+        {tab === 'team' && (
+          canViewUsers ? <TeamSection callerRole={user?.role ?? ''} /> : <AccessDenied />
         )}
 
         {tab === 'profile' && <ProfileSection />}

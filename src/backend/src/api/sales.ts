@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 import { io } from '../index.js';
 import { groupFilter, groupWrite } from '../middleware/groupFilter.js';
+import { requirePermission } from '../middleware/permissions.js';
 
 export const salesRouter = Router();
 
@@ -82,7 +83,7 @@ salesRouter.get('/invoices/:id', async (req, res, next) => {
 });
 
 // POST /api/v1/sales/invoices
-salesRouter.post('/invoices', async (req, res, next) => {
+salesRouter.post('/invoices', requirePermission('sales:write'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const userId = (req as any).user.userId;
@@ -163,7 +164,7 @@ salesRouter.post('/invoices', async (req, res, next) => {
 });
 
 // DELETE /api/v1/sales/invoices/:id
-salesRouter.delete('/invoices/:id', async (req, res, next) => {
+salesRouter.delete('/invoices/:id', requirePermission('sales:delete'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const gf = groupFilter(req);
@@ -186,7 +187,7 @@ salesRouter.delete('/invoices/:id', async (req, res, next) => {
 });
 
 // PATCH /api/v1/sales/invoices/:id/payment
-salesRouter.patch('/invoices/:id/payment', async (req, res, next) => {
+salesRouter.patch('/invoices/:id/payment', requirePermission('sales:payment_record'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const gf = groupFilter(req);

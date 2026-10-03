@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   Plus, Search, Trash2, Edit2, X, ChevronDown, CreditCard,
   FileText, TrendingUp, Clock, CheckCircle, XCircle, DollarSign,
@@ -774,6 +775,7 @@ const monthEnd = () => {
 };
 
 export default function SalesPage() {
+  const { canWriteSales, canDeleteSales, canRecordPayment } = usePermissions();
   const qc = useQueryClient();
 
   // ── Filters — default to current month
@@ -891,31 +893,33 @@ export default function SalesPage() {
               {fromDate && toDate ? `${fromDate} → ${toDate}` : currentMonth} · <strong style={{ color: '#5b5bd6', fontWeight: 700 }}>{stats ? fmt(stats.totalSales) : '—'}</strong> in sales
             </p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '7px',
-              padding: '9px 18px', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600,
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              background: '#5b5bd6',
-              color: '#fff',
-              boxShadow: '0 2px 8px rgba(91,91,214,0.35), inset 0 1px 0 rgba(255,255,255,0.12)',
-              transition: 'all 0.15s ease',
-              letterSpacing: '-0.01em',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = '#4646b5';
-              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 14px rgba(91,91,214,0.45)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = '#5b5bd6';
-              (e.currentTarget as HTMLButtonElement).style.transform = 'none';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(91,91,214,0.35)';
-            }}
-          >
-            <Plus size={15} /> New Invoice
-          </button>
+          {canWriteSales && (
+            <button
+              onClick={() => setShowCreate(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '7px',
+                padding: '9px 18px', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600,
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                background: '#5b5bd6',
+                color: '#fff',
+                boxShadow: '0 2px 8px rgba(91,91,214,0.35), inset 0 1px 0 rgba(255,255,255,0.12)',
+                transition: 'all 0.15s ease',
+                letterSpacing: '-0.01em',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#4646b5';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 14px rgba(91,91,214,0.45)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#5b5bd6';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'none';
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(91,91,214,0.35)';
+              }}
+            >
+              <Plus size={15} /> New Invoice
+            </button>
+          )}
         </div>
 
         {/* ── Stat Cards */}
@@ -1152,18 +1156,20 @@ export default function SalesPage() {
                             >
                               <Edit2 size={13} />
                             </button>
-                            <button
-                              className="action-btn"
-                              title="Delete"
-                              onClick={() => setDeleteTarget(inv)}
-                              style={{
-                                padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #fecaca',
-                                background: '#fef2f2', color: '#ef4444', cursor: 'pointer', opacity: 0.9,
-                                display: 'flex', alignItems: 'center',
-                              }}
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {canDeleteSales && (
+                              <button
+                                className="action-btn"
+                                title="Delete"
+                                onClick={() => setDeleteTarget(inv)}
+                                style={{
+                                  padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #fecaca',
+                                  background: '#fef2f2', color: '#ef4444', cursor: 'pointer', opacity: 0.9,
+                                  display: 'flex', alignItems: 'center',
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

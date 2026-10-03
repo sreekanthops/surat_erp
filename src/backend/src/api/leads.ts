@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../services/db.js';
 import { z } from 'zod';
 import { groupFilter, groupWrite } from '../middleware/groupFilter.js';
+import { requirePermission } from '../middleware/permissions.js';
 
 export const leadsRouter = Router();
 
@@ -53,7 +54,7 @@ const createLeadSchema = z.object({
 });
 
 // POST /api/v1/leads
-leadsRouter.post('/', async (req, res, next) => {
+leadsRouter.post('/', requirePermission('leads:write'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const groupId = groupWrite(req);
@@ -74,7 +75,7 @@ leadsRouter.post('/', async (req, res, next) => {
 });
 
 // PUT /api/v1/leads/:id
-leadsRouter.put('/:id', async (req, res, next) => {
+leadsRouter.put('/:id', requirePermission('leads:write'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const gf = groupFilter(req);
@@ -89,7 +90,7 @@ leadsRouter.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/v1/leads/:id
-leadsRouter.delete('/:id', async (req, res, next) => {
+leadsRouter.delete('/:id', requirePermission('leads:delete'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const gf = groupFilter(req);
@@ -99,7 +100,7 @@ leadsRouter.delete('/:id', async (req, res, next) => {
 });
 
 // PATCH /api/v1/leads/:id/status
-leadsRouter.patch('/:id/status', async (req, res, next) => {
+leadsRouter.patch('/:id/status', requirePermission('leads:write'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const gf = groupFilter(req);

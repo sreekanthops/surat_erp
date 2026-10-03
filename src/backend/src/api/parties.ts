@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../services/db.js';
 import { z } from 'zod';
 import { groupFilter, groupWrite } from '../middleware/groupFilter.js';
+import { requirePermission } from '../middleware/permissions.js';
 
 export const partiesRouter = Router();
 
@@ -75,7 +76,7 @@ const createPartySchema = z.object({
 });
 
 // POST /api/v1/parties
-partiesRouter.post('/', async (req, res, next) => {
+partiesRouter.post('/', requirePermission('parties:write'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const groupId = groupWrite(req);
@@ -88,7 +89,7 @@ partiesRouter.post('/', async (req, res, next) => {
 });
 
 // PUT /api/v1/parties/:id
-partiesRouter.put('/:id', async (req, res, next) => {
+partiesRouter.put('/:id', requirePermission('parties:write'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const gf = groupFilter(req);
@@ -100,7 +101,7 @@ partiesRouter.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/v1/parties/:id
-partiesRouter.delete('/:id', async (req, res, next) => {
+partiesRouter.delete('/:id', requirePermission('parties:delete'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const gf = groupFilter(req);

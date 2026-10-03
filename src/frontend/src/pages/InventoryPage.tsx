@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
 import * as XLSX from 'xlsx';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   Plus, Search, Pencil, Trash2, X, Package, DollarSign, AlertTriangle, ShoppingCart,
   ArrowDownToLine, ArrowUpFromLine, RotateCcw, History, BarChart2, Download, ChevronLeft, ChevronRight,
@@ -1035,9 +1036,10 @@ function ValuationTab() {
 
 // ─── Product Row ─────────────────────────────────────────────────────────────
 
-function ProductRow({ product: p, onEdit, onDelete, onAdjust, onInward, onHistory, onSalesReturn, onPurchaseReturn }: {
+function ProductRow({ product: p, onEdit, onDelete, onAdjust, onInward, onHistory, onSalesReturn, onPurchaseReturn, perms }: {
   product: Product; onEdit: () => void; onDelete: () => void; onAdjust: () => void;
   onInward: () => void; onHistory: () => void; onSalesReturn: () => void; onPurchaseReturn: () => void;
+  perms: { canWriteProduct: boolean; canDeleteProduct: boolean; canWriteStock: boolean };
 }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -1059,13 +1061,13 @@ function ProductRow({ product: p, onEdit, onDelete, onAdjust, onInward, onHistor
       <td style={{ ...S.td, color: '#4b5563' }}>{p.gstRate}%</td>
       <td style={{ ...S.td, textAlign: 'center' }}>
         <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button style={S.actionBtn('#059669', '#ecfdf5')} onClick={onInward} title="Stock Inward"><ArrowDownToLine size={13} /></button>
-          <button style={S.actionBtn('#7c3aed', '#f5f3ff')} onClick={onAdjust} title="Adjust Stock"><BarChart2 size={13} /></button>
+          {perms.canWriteStock && <button style={S.actionBtn('#059669', '#ecfdf5')} onClick={onInward} title="Stock Inward"><ArrowDownToLine size={13} /></button>}
+          {perms.canWriteStock && <button style={S.actionBtn('#7c3aed', '#f5f3ff')} onClick={onAdjust} title="Adjust Stock"><BarChart2 size={13} /></button>}
           <button style={S.actionBtn('#2563eb', '#eff6ff')} onClick={onHistory} title="History"><History size={13} /></button>
-          <button style={S.actionBtn('#d97706', '#fffbeb')} onClick={onSalesReturn} title="Sales Return"><RotateCcw size={13} /></button>
-          <button style={S.actionBtn('#b45309', '#fef3c7')} onClick={onPurchaseReturn} title="Purchase Return"><ArrowUpFromLine size={13} /></button>
-          <button style={S.actionBtn('#5b5bd6', '#ede9fe')} onClick={onEdit} title="Edit"><Pencil size={13} /></button>
-          <button style={S.actionBtn('#ef4444', '#fef2f2')} onClick={onDelete} title="Delete"><Trash2 size={13} /></button>
+          {perms.canWriteStock && <button style={S.actionBtn('#d97706', '#fffbeb')} onClick={onSalesReturn} title="Sales Return"><RotateCcw size={13} /></button>}
+          {perms.canWriteStock && <button style={S.actionBtn('#b45309', '#fef3c7')} onClick={onPurchaseReturn} title="Purchase Return"><ArrowUpFromLine size={13} /></button>}
+          {perms.canWriteProduct && <button style={S.actionBtn('#5b5bd6', '#ede9fe')} onClick={onEdit} title="Edit"><Pencil size={13} /></button>}
+          {perms.canDeleteProduct && <button style={S.actionBtn('#ef4444', '#fef2f2')} onClick={onDelete} title="Delete"><Trash2 size={13} /></button>}
         </div>
       </td>
     </tr>
@@ -1075,6 +1077,7 @@ function ProductRow({ product: p, onEdit, onDelete, onAdjust, onInward, onHistor
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
+  const { canWriteProduct, canDeleteProduct, canWriteStock, canBulkImport, canManageGodowns } = usePermissions();
   const qc = useQueryClient();
 
   // Tabs
@@ -1216,7 +1219,7 @@ export default function InventoryPage() {
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button style={S.secondaryBtn} onClick={exportProducts}><Download size={14} />Export</button>
-            <button style={S.primaryBtn} onClick={openAdd}><Plus size={15} />Add Product</button>
+            {canWriteProduct && <button style={S.primaryBtn} onClick={openAdd}><Plus size={15} />Add Product</button>}
           </div>
         </div>
 
@@ -1315,6 +1318,7 @@ export default function InventoryPage() {
                           onHistory={() => setHistoryTarget(p)}
                           onSalesReturn={() => setSalesReturnTarget(p)}
                           onPurchaseReturn={() => setPurchaseReturnTarget(p)}
+                          perms={{ canWriteProduct, canDeleteProduct, canWriteStock }}
                         />
                       ))
                     )}

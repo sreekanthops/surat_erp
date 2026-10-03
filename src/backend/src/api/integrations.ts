@@ -3,6 +3,7 @@ import { prisma } from '../services/db.js';
 import axios from 'axios';
 import { google } from 'googleapis';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/permissions.js';
 
 export const integrationsRouter = Router();
 
@@ -74,7 +75,7 @@ function extractBody(parts: any[]): string {
 
 // ── GET /api/v1/integrations/app-credentials ─────────────────────────────────
 // Returns the shared redirect URI so the Settings UI can display it to the user
-integrationsRouter.get('/app-credentials', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (_req, res) => {
+integrationsRouter.get('/app-credentials', requirePermission('integrations:view'), async (_req, res) => {
   return res.json({
     googleClientId:    '',           // not exposed — managed by server admin
     googleRedirectUri: GMAIL_CALLBACK,
@@ -123,7 +124,7 @@ integrationsRouter.get('/status', async (req, res, next) => {
 // ── POST /api/v1/integrations/whatsapp/setup ─────────────────────────────────
 // Save WhatsApp Business credentials. Verifies the token against Meta API.
 // OWNER / MANAGER only
-integrationsRouter.post('/whatsapp/setup', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+integrationsRouter.post('/whatsapp/setup', requirePermission('integrations:configure'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const { displayPhone, phoneNumberId, wabaId, accessToken, appSecret, verifyToken } = req.body;
@@ -195,7 +196,7 @@ integrationsRouter.post('/whatsapp/setup', requireRole('OWNER', 'MANAGER', 'SUPE
 });
 
 // ── DELETE /api/v1/integrations/whatsapp/disconnect ──────────────────────────
-integrationsRouter.delete('/whatsapp/disconnect', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+integrationsRouter.delete('/whatsapp/disconnect', requirePermission('integrations:configure'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     await prisma.integrationConfig.updateMany({
@@ -261,7 +262,7 @@ integrationsRouter.post('/tally/sync', async (req, res, next) => {
 // ── GET /api/v1/integrations/gmail/connect ────────────────────────────────────
 // Returns the Google OAuth URL for the user to visit and authorize
 // OWNER / MANAGER only
-integrationsRouter.get('/gmail/connect', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+integrationsRouter.get('/gmail/connect', requirePermission('integrations:configure'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     const { clientId } = getGoogleCreds();
@@ -322,7 +323,7 @@ gmailCallbackRouter.get('/', async (req, res, next) => {
 });
 
 // ── DELETE /api/v1/integrations/gmail/disconnect ──────────────────────────────
-integrationsRouter.delete('/gmail/disconnect', requireRole('OWNER', 'MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+integrationsRouter.delete('/gmail/disconnect', requirePermission('integrations:configure'), async (req, res, next) => {
   try {
     const tenantId = (req as any).user.tenantId;
     await prisma.integrationConfig.updateMany({
