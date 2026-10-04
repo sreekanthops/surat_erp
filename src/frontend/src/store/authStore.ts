@@ -9,10 +9,11 @@ interface Group {
 interface User {
   id: string;
   name: string;
-  phone: string;
+  username: string;
+  phone?: string | null;
   role: string;
   tenant: { id: string; name: string; plan: string };
-  group?: Group | null;
+  group: Group;
 }
 
 interface AuthState {

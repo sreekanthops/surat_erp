@@ -499,35 +499,47 @@ const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
 };
 
 interface TeamUser {
-  id: string; name: string; phone: string; email?: string;
+  id: string; name: string; username: string; phone?: string | null; email?: string;
   role: string; isActive: boolean; lastLoginAt?: string | null;
   group?: { id: string; name: string } | null;
 }
 
 function TeamSection({ callerRole }: { callerRole: string }) {
   const { canWriteUsers, canDeleteUsers, isOwnerOrAbove } = usePermissions();
+  const currentUser = useAuthStore(s => s.user);
   const [users, setUsers] = useState<TeamUser[]>([]);
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editUser, setEditUser] = useState<TeamUser | null>(null);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', password: '', role: 'STAFF' });
+  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', role: 'STAFF', groupId: '' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/api/v1/users');
-      setUsers(res.data.data);
+      const [usersRes, groupsRes] = await Promise.all([
+        api.get('/api/v1/users'),
+        api.get('/api/v1/admin/groups'),
+      ]);
+      setUsers(usersRes.data.data);
+      setGroups(groupsRes.data.data ?? []);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const openAdd = () => { setEditUser(null); setForm({ name: '', phone: '', email: '', password: '', role: 'STAFF' }); setShowAdd(true); };
+  const defaultGroupId = currentUser?.group?.id ?? groups[0]?.id ?? '';
+
+  const openAdd = () => {
+    setEditUser(null);
+    setForm({ name: '', username: '', email: '', password: '', role: 'STAFF', groupId: defaultGroupId });
+    setShowAdd(true);
+  };
   const openEdit = (u: TeamUser) => {
     setEditUser(u);
-    setForm({ name: u.name, phone: u.phone ?? '', email: u.email ?? '', password: '', role: u.role });
+    setForm({ name: u.name, username: u.username ?? '', email: u.email ?? '', password: '', role: u.role, groupId: u.group?.id ?? defaultGroupId });
     setShowAdd(true);
   };
 
@@ -535,11 +547,11 @@ function TeamSection({ callerRole }: { callerRole: string }) {
     setSaving(true); setMsg(null);
     try {
       if (editUser) {
-        const payload: any = { name: form.name, email: form.email || undefined, role: form.role };
+        const payload: any = { name: form.name, username: form.username || undefined, email: form.email || undefined, role: form.role };
         if (form.password) payload.password = form.password;
         await api.put(`/api/v1/users/${editUser.id}`, payload);
       } else {
-        await api.post('/api/v1/users', form);
+        await api.post('/api/v1/users', { ...form, groupId: form.groupId || defaultGroupId });
       }
       setMsg({ type: 'success', text: editUser ? 'User updated.' : 'User created successfully.' });
       setShowAdd(false); setEditUser(null);
@@ -587,7 +599,7 @@ function TeamSection({ callerRole }: { callerRole: string }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#f7f8fa' }}>
-                {['Name', 'Phone', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
+                {['Name', 'Login', 'Group', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '1px solid #e5e7eb', fontSize: '12px' }}>{h}</th>
                 ))}
               </tr>
@@ -602,7 +614,16 @@ function TeamSection({ callerRole }: { callerRole: string }) {
                       <div style={{ fontWeight: 600, color: '#1f2328' }}>{u.name}</div>
                       {u.email && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{u.email}</div>}
                     </td>
-                    <td style={{ padding: '10px 14px', color: '#4b5563' }}>{u.phone}</td>
+                    <td style={{ padding: '10px 14px' }}>
+                      {u.group && (
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                          <span style={{ color: '#5b21b6', fontWeight: 600 }}>{u.group.name}</span>
+                          <span style={{ color: '#d1d5db' }}>/</span>
+                          <span style={{ fontWeight: 600, color: '#166534' }}>{u.username}</span>
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontSize: '12px', color: '#6b7280' }}>{u.group?.name ?? '—'}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ ...rc, display: 'inline-block', borderRadius: '5px', padding: '2px 8px', fontSize: '11.5px', fontWeight: 700 }}>
                         {ROLE_LABELS[u.role] ?? u.role}
@@ -659,10 +680,16 @@ function TeamSection({ callerRole }: { callerRole: string }) {
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Full Name *</label>
                 <input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Rajesh Kumar" />
               </div>
-              {!editUser && (
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Username * <span style={{ fontWeight: 400, color: '#9ca3af' }}>(used to login: group/username)</span></label>
+                <input style={S.input} value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '') }))} placeholder="e.g. sri" />
+              </div>
+              {!editUser && groups.length > 1 && (
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Phone (used to login) *</label>
-                  <input style={S.input} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>Group *</label>
+                  <select style={{ ...S.input, cursor: 'pointer' }} value={form.groupId} onChange={e => setForm(f => ({ ...f, groupId: e.target.value }))}>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
                 </div>
               )}
               <div>
@@ -689,9 +716,9 @@ function TeamSection({ callerRole }: { callerRole: string }) {
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
               <button style={{ padding: '8px 18px', borderRadius: '8px', border: '1.5px solid #e4e7ef', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }} onClick={() => { setShowAdd(false); setMsg(null); }}>Cancel</button>
               <button
-                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#5b5bd6', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', opacity: saving || !form.name.trim() || (!editUser && !form.phone.trim()) || (!editUser && !form.password) ? 0.6 : 1 }}
+                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#5b5bd6', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', opacity: saving || !form.name.trim() || !form.username.trim() || (!editUser && !form.password) ? 0.6 : 1 }}
                 onClick={handleSave}
-                disabled={saving || !form.name.trim() || (!editUser && !form.phone.trim()) || (!editUser && !form.password)}
+                disabled={saving || !form.name.trim() || !form.username.trim() || (!editUser && !form.password)}
               >
                 {saving ? 'Saving…' : editUser ? 'Save Changes' : 'Create Member'}
               </button>

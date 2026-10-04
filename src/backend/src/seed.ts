@@ -28,19 +28,46 @@ async function main() {
   });
   console.log('✅ Tenant:', tenant.name);
 
-  // ── Users ─────────────────────────────────────────────────────────────────
-  const hash = await bcrypt.hash('admin123', 10);
-  await prisma.user.upsert({
-    where:  { phone: '7075077384' },
+  // ── Default Group ─────────────────────────────────────────────────────────
+  const GROUP_ID = '00000000-0000-0000-0000-000000000002';
+  const group = await prisma.group.upsert({
+    where:  { id: GROUP_ID },
     update: {},
-    create: { tenantId: TENANT_ID, name: 'Owner', phone: '7075077384', passwordHash: hash, role: 'OWNER', isActive: true },
+    create: {
+      id: GROUP_ID, tenantId: TENANT_ID,
+      name: 'textileiq',
+      description: 'Default group for GSpaces TextileIQ',
+      isActive: true,
+    },
+  });
+  console.log('✅ Group:', group.name);
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+  // Login format: textileiq/owner  and  textileiq/ramesh
+  const hash = await bcrypt.hash('admin123', 10);
+  const USER_OWNER_ID   = '00000000-0000-0000-0000-000000000003';
+  const USER_MANAGER_ID = '00000000-0000-0000-0000-000000000004';
+
+  await prisma.user.upsert({
+    where:  { id: USER_OWNER_ID },
+    update: {},
+    create: {
+      id: USER_OWNER_ID, tenantId: TENANT_ID, groupId: GROUP_ID,
+      name: 'Owner', username: 'owner', phone: '7075077384',
+      passwordHash: hash, role: 'OWNER', isActive: true,
+    },
   });
   await prisma.user.upsert({
-    where:  { phone: '9876543210' },
+    where:  { id: USER_MANAGER_ID },
     update: {},
-    create: { tenantId: TENANT_ID, name: 'Ramesh Shah', phone: '9876543210', passwordHash: hash, role: 'MANAGER', isActive: true },
+    create: {
+      id: USER_MANAGER_ID, tenantId: TENANT_ID, groupId: GROUP_ID,
+      name: 'Ramesh Shah', username: 'ramesh', phone: '9876543210',
+      passwordHash: hash, role: 'MANAGER', isActive: true,
+    },
   });
   console.log('✅ Users created');
+  console.log('   Login: textileiq/owner  | textileiq/ramesh  (password: admin123)');
 
   // ── Godown ────────────────────────────────────────────────────────────────
   const godown = await prisma.godown.upsert({
@@ -364,7 +391,8 @@ async function main() {
   console.log(`  Leads        : ${leadCount}`);
   console.log(`  Messages     : ${msgCount}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('  Login → Phone: 7075077384  Pass: admin123');
+  console.log('  Login → textileiq/owner    Pass: admin123');
+  console.log('  Login → textileiq/ramesh   Pass: admin123');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
   // ── Update system prompt in ai.ts to include actual DB context ─────────────

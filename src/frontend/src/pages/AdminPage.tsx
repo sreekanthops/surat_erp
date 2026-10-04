@@ -627,7 +627,7 @@ function TenantsTab() {
   const [form, setForm] = useState({
     companyName: '', gstin: '', city: 'Surat', state: 'Gujarat',
     phone: '', email: '', plan: 'STARTER', planDays: 30,
-    ownerName: '', ownerPhone: '', ownerEmail: '', ownerPassword: '',
+    groupName: '', ownerName: '', ownerUsername: '', ownerPhone: '', ownerEmail: '', ownerPassword: '',
   });
 
   const load = useCallback(async () => {
@@ -644,9 +644,9 @@ function TenantsTab() {
     setSaving(true); setMsg(null);
     try {
       await api.post('/api/v1/admin/tenants', { ...form, planDays: Number(form.planDays) });
-      setMsg({ type: 'success', text: `Client "${form.companyName}" created. Owner login: ${form.ownerPhone} / ${form.ownerPassword}` });
+      setMsg({ type: 'success', text: `Client "${form.companyName}" created. Owner login: ${form.groupName}/${form.ownerUsername}` });
       setShowCreate(false);
-      setForm({ companyName: '', gstin: '', city: 'Surat', state: 'Gujarat', phone: '', email: '', plan: 'STARTER', planDays: 30, ownerName: '', ownerPhone: '', ownerEmail: '', ownerPassword: '' });
+      setForm({ companyName: '', gstin: '', city: 'Surat', state: 'Gujarat', phone: '', email: '', plan: 'STARTER', planDays: 30, groupName: '', ownerName: '', ownerUsername: '', ownerPhone: '', ownerEmail: '', ownerPassword: '' });
       load();
     } catch (e: any) {
       setMsg({ type: 'error', text: e?.response?.data?.error || 'Failed to create client.' });
@@ -810,15 +810,23 @@ function TenantsTab() {
               </div>
             </div>
 
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '12px' }}>Owner Account</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '12px' }}>Login Group & Owner Account</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={lbl}>Group Name * <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '11px' }}>(login prefix, e.g. "shahfabrics")</span></label>
+                <input style={inp} value={form.groupName} onChange={e => setForm(f => ({ ...f, groupName: e.target.value.toLowerCase().replace(/\s+/g, '') }))} placeholder="shahfabrics" />
+              </div>
               <div>
                 <label style={lbl}>Owner Name *</label>
                 <input style={inp} value={form.ownerName} onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))} placeholder="Ramesh Sharma" />
               </div>
               <div>
-                <label style={lbl}>Owner Phone (login) *</label>
-                <input style={inp} value={form.ownerPhone} onChange={e => setForm(f => ({ ...f, ownerPhone: e.target.value }))} placeholder="9876543210" />
+                <label style={lbl}>Owner Username * <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '11px' }}>(e.g. "ramesh")</span></label>
+                <input style={inp} value={form.ownerUsername} onChange={e => setForm(f => ({ ...f, ownerUsername: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '') }))} placeholder="ramesh" />
+              </div>
+              <div>
+                <label style={lbl}>Owner Phone</label>
+                <input style={inp} value={form.ownerPhone} onChange={e => setForm(f => ({ ...f, ownerPhone: e.target.value }))} placeholder="9876543210 (optional)" />
               </div>
               <div>
                 <label style={lbl}>Owner Email</label>
@@ -829,13 +837,16 @@ function TenantsTab() {
                 <input style={inp} type="password" value={form.ownerPassword} onChange={e => setForm(f => ({ ...f, ownerPassword: e.target.value }))} placeholder="Min. 6 characters" />
               </div>
             </div>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px', background: '#f8f9fc', borderRadius: '8px', padding: '8px 12px' }}>
+              Owner login will be: <strong style={{ color: '#5b21b6' }}>{form.groupName || 'groupname'}</strong>/<strong style={{ color: '#166534' }}>{form.ownerUsername || 'username'}</strong>
+            </div>
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
               <button style={{ padding: '9px 18px', borderRadius: '8px', border: '1.5px solid #e4e7ef', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }} onClick={() => { setShowCreate(false); setMsg(null); }}>Cancel</button>
               <button
-                style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', opacity: saving || !form.companyName || !form.ownerName || !form.ownerPhone || !form.ownerPassword ? 0.6 : 1 }}
+                style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#6366f1', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', opacity: saving || !form.companyName || !form.groupName || !form.ownerName || !form.ownerUsername || !form.ownerPassword ? 0.6 : 1 }}
                 onClick={handleCreate}
-                disabled={saving || !form.companyName || !form.ownerName || !form.ownerPhone || !form.ownerPassword}
+                disabled={saving || !form.companyName || !form.groupName || !form.ownerName || !form.ownerUsername || !form.ownerPassword}
               >
                 {saving ? 'Creating…' : 'Create Client'}
               </button>

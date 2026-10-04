@@ -5,20 +5,29 @@ import api from '@/hooks/useApi';
 import { Eye, EyeOff, AlertCircle, BarChart3, MessageSquare, Package } from 'lucide-react';
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState('');
+  const [login, setLogin]     = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
-  const { setAuth } = useAuthStore();
-  const navigate = useNavigate();
+  const { setAuth }  = useAuthStore();
+  const navigate     = useNavigate();
+
+  // Split "groupname/username" while typing to show a live hint
+  const slashIdx  = login.indexOf('/');
+  const groupPart = slashIdx >= 0 ? login.slice(0, slashIdx) : login;
+  const userPart  = slashIdx >= 0 ? login.slice(slashIdx + 1) : '';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!login.includes('/')) {
+      setError('Enter login as groupname/username  e.g. textileiq/sri');
+      return;
+    }
     setLoading(true);
     try {
-      const { data } = await api.post('/api/v1/auth/login', { phone, password });
+      const { data } = await api.post('/api/v1/auth/login', { login: login.trim(), password });
       setAuth(data.token, data.refreshToken, data.user);
       navigate('/dashboard');
     } catch (err: any) {
@@ -29,10 +38,28 @@ export default function LoginPage() {
   };
 
   const features = [
-    { icon: BarChart3,      title: 'Live Dashboard',    desc: 'Real-time sales, profit & inventory analytics' },
-    { icon: MessageSquare,  title: 'WhatsApp + Gmail',  desc: 'Unified inbox with AI intent detection' },
-    { icon: Package,        title: 'Smart Inventory',   desc: 'Stock tracking with low-stock alerts' },
+    { icon: BarChart3,     title: 'Live Dashboard',   desc: 'Real-time sales, profit & inventory analytics' },
+    { icon: MessageSquare, title: 'WhatsApp + Gmail',  desc: 'Unified inbox with AI intent detection' },
+    { icon: Package,       title: 'Smart Inventory',   desc: 'Stock tracking with low-stock alerts' },
   ];
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '10px 14px',
+    border: '1.5px solid #e4e7ef', borderRadius: '10px',
+    fontSize: '14px', color: '#111827', background: '#f8f9fc',
+    outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s, background 0.15s',
+    boxSizing: 'border-box', fontFamily: 'inherit',
+  };
+  const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.borderColor = '#5b5bd6';
+    e.target.style.boxShadow   = '0 0 0 3px rgba(91,91,214,0.10)';
+    e.target.style.background  = '#fff';
+  };
+  const onBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.borderColor = '#e4e7ef';
+    e.target.style.boxShadow   = 'none';
+    e.target.style.background  = '#f8f9fc';
+  };
 
   return (
     <div style={{
@@ -59,18 +86,9 @@ export default function LoginPage() {
           position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
           background: 'linear-gradient(90deg, #5b5bd6, #8b5cf6, #06b6d4)',
         }} />
-
-        {/* Ambient glow */}
-        <div style={{
-          position: 'absolute', width: '500px', height: '500px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(91,91,214,0.15) 0%, transparent 65%)',
-          top: '-150px', left: '-100px', pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', width: '400px', height: '400px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 65%)',
-          bottom: '-100px', right: '-80px', pointerEvents: 'none',
-        }} />
+        {/* Ambient glows */}
+        <div style={{ position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(91,91,214,0.15) 0%, transparent 65%)', top: '-150px', left: '-100px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 65%)', bottom: '-100px', right: '-80px', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', maxWidth: '420px', width: '100%' }}>
           {/* Logo */}
@@ -82,17 +100,11 @@ export default function LoginPage() {
             boxShadow: '0 8px 32px rgba(91,91,214,0.5)',
           }}>🧵</div>
 
-          <h1 style={{
-            fontSize: '32px', fontWeight: 800, color: '#f8fafc',
-            margin: '0 0 10px', lineHeight: 1.15, letterSpacing: '-0.04em',
-          }}>
+          <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', margin: '0 0 10px', lineHeight: 1.15, letterSpacing: '-0.04em' }}>
             GSpaces<br />
             <span style={{ color: '#a5b4fc' }}>TextileIQ</span>
           </h1>
-          <p style={{
-            fontSize: '14px', color: 'rgba(148,163,184,0.8)', lineHeight: 1.7,
-            margin: '0 0 40px', maxWidth: '320px',
-          }}>
+          <p style={{ fontSize: '14px', color: 'rgba(148,163,184,0.8)', lineHeight: 1.7, margin: '0 0 40px', maxWidth: '320px' }}>
             The all-in-one business OS for Surat's textile industry.
           </p>
 
@@ -100,12 +112,7 @@ export default function LoginPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {features.map(({ icon: Icon, title, desc }) => (
               <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                <div style={{
-                  width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0,
-                  background: 'rgba(91,91,214,0.2)', border: '1px solid rgba(91,91,214,0.25)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#a5b4fc',
-                }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0, background: 'rgba(91,91,214,0.2)', border: '1px solid rgba(91,91,214,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a5b4fc' }}>
                   <Icon size={16} />
                 </div>
                 <div>
@@ -119,87 +126,66 @@ export default function LoginPage() {
           {/* Bottom tags */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '40px', flexWrap: 'wrap' }}>
             {['AI-Powered', 'Multi-tenant', 'WhatsApp Ready', 'Real-time'].map(tag => (
-              <div key={tag} style={{
-                fontSize: '11px', fontWeight: 600, color: 'rgba(148,163,184,0.6)',
-                padding: '4px 12px', borderRadius: '20px',
-                border: '1px solid rgba(255,255,255,0.08)',
-                background: 'rgba(255,255,255,0.04)',
-                letterSpacing: '0.02em',
-              }}>{tag}</div>
+              <div key={tag} style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(148,163,184,0.6)', padding: '4px 12px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', letterSpacing: '0.02em' }}>{tag}</div>
             ))}
           </div>
         </div>
       </div>
 
       {/* ══ Right panel — form ══ */}
-      <div style={{
-        width: '460px',
-        flexShrink: 0,
-        background: '#ffffff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '48px 44px',
-        borderLeft: '1px solid #e4e7ef',
-      }}>
+      <div style={{ width: '460px', flexShrink: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 44px', borderLeft: '1px solid #e4e7ef' }}>
         <div style={{ width: '100%', maxWidth: '360px' }}>
 
           <div style={{ marginBottom: '32px' }}>
-            <h2 style={{
-              fontSize: '24px', fontWeight: 800, color: '#111827',
-              margin: '0 0 6px', letterSpacing: '-0.035em',
-            }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#111827', margin: '0 0 6px', letterSpacing: '-0.035em' }}>
               Welcome back
             </h2>
             <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, lineHeight: 1.5 }}>
-              Sign in to your TextileIQ account
+              Sign in to your TextileIQ workspace
             </p>
           </div>
 
           <form onSubmit={handleLogin}>
-            {/* Phone */}
+
+            {/* Login field: groupname/username */}
             <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                display: 'block', fontSize: '11.5px', fontWeight: 600,
-                color: '#374151', marginBottom: '6px',
-                letterSpacing: '0.04em', textTransform: 'uppercase',
-              }}>
-                Phone Number
+              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Login
               </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="9876543210"
-                required
-                autoFocus
-                style={{
-                  width: '100%', padding: '10px 14px',
-                  border: '1.5px solid #e4e7ef', borderRadius: '10px',
-                  fontSize: '14px', color: '#111827', background: '#f8f9fc',
-                  outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s, background 0.15s',
-                  boxSizing: 'border-box', fontFamily: 'inherit',
-                }}
-                onFocus={e => {
-                  e.target.style.borderColor = '#5b5bd6';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(91,91,214,0.10)';
-                  e.target.style.background = '#fff';
-                }}
-                onBlur={e => {
-                  e.target.style.borderColor = '#e4e7ef';
-                  e.target.style.boxShadow = 'none';
-                  e.target.style.background = '#f8f9fc';
-                }}
-              />
+
+              {/* Visual split input */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={login}
+                  onChange={e => setLogin(e.target.value)}
+                  placeholder="groupname/username"
+                  required
+                  autoFocus
+                  autoComplete="username"
+                  spellCheck={false}
+                  style={{ ...inputStyle, letterSpacing: '0.01em' }}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                />
+              </div>
+
+              {/* Live split hint */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', fontSize: '12px', color: '#9ca3af', alignItems: 'center' }}>
+                {groupPart && (
+                  <>
+                    <span style={{ background: '#ede9fe', color: '#5b21b6', borderRadius: '5px', padding: '1px 7px', fontWeight: 600 }}>{groupPart}</span>
+                    {slashIdx >= 0 && <span style={{ color: '#d1d5db' }}>/</span>}
+                    {userPart && <span style={{ background: '#f0fdf4', color: '#166534', borderRadius: '5px', padding: '1px 7px', fontWeight: 600 }}>{userPart}</span>}
+                  </>
+                )}
+                {!groupPart && <span>e.g. <strong style={{ color: '#6b7280' }}>textileiq/sri</strong></span>}
+              </div>
             </div>
 
             {/* Password */}
             <div style={{ marginBottom: '24px' }}>
-              <label style={{
-                display: 'block', fontSize: '11.5px', fontWeight: 600,
-                color: '#374151', marginBottom: '6px',
-                letterSpacing: '0.04em', textTransform: 'uppercase',
-              }}>
+              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 Password
               </label>
               <div style={{ position: 'relative' }}>
@@ -209,32 +195,15 @@ export default function LoginPage() {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  style={{
-                    width: '100%', padding: '10px 44px 10px 14px',
-                    border: '1.5px solid #e4e7ef', borderRadius: '10px',
-                    fontSize: '14px', color: '#111827', background: '#f8f9fc',
-                    outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s, background 0.15s',
-                    boxSizing: 'border-box', fontFamily: 'inherit',
-                  }}
-                  onFocus={e => {
-                    e.target.style.borderColor = '#5b5bd6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(91,91,214,0.10)';
-                    e.target.style.background = '#fff';
-                  }}
-                  onBlur={e => {
-                    e.target.style.borderColor = '#e4e7ef';
-                    e.target.style.boxShadow = 'none';
-                    e.target.style.background = '#f8f9fc';
-                  }}
+                  autoComplete="current-password"
+                  style={{ ...inputStyle, padding: '10px 44px 10px 14px' }}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(v => !v)}
-                  style={{
-                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px',
-                    display: 'flex', alignItems: 'center',
-                  }}
+                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', display: 'flex', alignItems: 'center' }}
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -243,12 +212,7 @@ export default function LoginPage() {
 
             {/* Error */}
             {error && (
-              <div style={{
-                display: 'flex', alignItems: 'flex-start', gap: '8px',
-                background: '#fef2f2', border: '1px solid #fecaca',
-                borderRadius: '10px', padding: '10px 14px', marginBottom: '20px',
-                fontSize: '13px', color: '#dc2626',
-              }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 14px', marginBottom: '20px', fontSize: '13px', color: '#dc2626' }}>
                 <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
                 {error}
               </div>
@@ -265,21 +229,19 @@ export default function LoginPage() {
                 fontSize: '14px', fontWeight: 700, color: '#fff',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 boxShadow: loading ? 'none' : '0 2px 8px rgba(91,91,214,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
-                transition: 'all 0.18s ease',
-                fontFamily: 'inherit',
-                letterSpacing: '-0.01em',
+                transition: 'all 0.18s ease', fontFamily: 'inherit', letterSpacing: '-0.01em',
               }}
               onMouseEnter={e => {
                 if (!loading) {
-                  (e.currentTarget as HTMLButtonElement).style.background = '#4646b5';
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(91,91,214,0.45)';
+                  (e.currentTarget as HTMLButtonElement).style.background   = '#4646b5';
+                  (e.currentTarget as HTMLButtonElement).style.transform    = 'translateY(-1px)';
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow    = '0 4px 16px rgba(91,91,214,0.45)';
                 }
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLButtonElement).style.background = loading ? '#a5b4fc' : '#5b5bd6';
-                (e.currentTarget as HTMLButtonElement).style.transform = 'none';
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = loading ? 'none' : '0 2px 8px rgba(91,91,214,0.35)';
+                (e.currentTarget as HTMLButtonElement).style.transform  = 'none';
+                (e.currentTarget as HTMLButtonElement).style.boxShadow  = loading ? 'none' : '0 2px 8px rgba(91,91,214,0.35)';
               }}
             >
               {loading ? 'Signing in…' : 'Sign in →'}

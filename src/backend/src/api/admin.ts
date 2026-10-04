@@ -51,36 +51,35 @@ adminRouter.get('/tenants', requireRole('SUPER_ADMIN'), async (_req, res, next) 
 
 const createTenantSchema = z.object({
   // Tenant details
-  companyName:  z.string().min(1),
-  gstin:        z.string().optional(),
-  city:         z.string().default('Surat'),
-  state:        z.string().default('Gujarat'),
-  phone:        z.string().optional(),
-  email:        z.string().email().optional(),
-  plan:         z.enum(['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE']).default('STARTER'),
-  planDays:     z.number().default(30),
+  companyName:   z.string().min(1),
+  gstin:         z.string().optional(),
+  city:          z.string().default('Surat'),
+  state:         z.string().default('Gujarat'),
+  phone:         z.string().optional(),
+  email:         z.string().email().optional(),
+  plan:          z.enum(['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE']).default('STARTER'),
+  planDays:      z.number().default(30),
+  // Default group name (login prefix for all users in this tenant)
+  groupName:     z.string().min(1),
   // First OWNER user
-  ownerName:    z.string().min(1),
-  ownerPhone:   z.string().min(10),
-  ownerEmail:   z.string().email().optional(),
+  ownerName:     z.string().min(1),
+  ownerUsername: z.string().min(2).max(50).regex(/^[a-zA-Z0-9_.-]+$/),
+  ownerPhone:    z.string().optional(),
+  ownerEmail:    z.string().email().optional(),
   ownerPassword: z.string().min(6),
 });
 
-// POST /api/v1/admin/tenants — create a new client tenant + owner (SUPER_ADMIN only)
+// POST /api/v1/admin/tenants — create a new client tenant + default group + owner (SUPER_ADMIN only)
 adminRouter.post('/tenants', requireRole('SUPER_ADMIN'), async (req, res, next) => {
   try {
     const body = createTenantSchema.parse(req.body);
-
-    // Check phone uniqueness
-    const existing = await prisma.user.findUnique({ where: { phone: body.ownerPhone } });
-    if (existing) return res.status(409).json({ error: 'A user with this phone number already exists.' });
 
     const planExpiresAt = new Date();
     planExpiresAt.setDate(planExpiresAt.getDate() + body.planDays);
 
     const passwordHash = await bcrypt.hash(body.ownerPassword, 10);
 
-    // Create tenant + owner in a transaction
+    // Create tenant + default group + owner in a transaction
     const result = await prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
         data: {
@@ -97,20 +96,32 @@ adminRouter.post('/tenants', requireRole('SUPER_ADMIN'), async (req, res, next) 
         },
       });
 
+      // Create the default group (login prefix)
+      const group = await tx.group.create({
+        data: {
+          tenantId:    tenant.id,
+          name:        body.groupName.toLowerCase(),
+          description: `Default group for ${body.companyName}`,
+          isActive:    true,
+        },
+      });
+
       const owner = await tx.user.create({
         data: {
           tenantId:     tenant.id,
+          groupId:      group.id,
           name:         body.ownerName,
-          phone:        body.ownerPhone,
+          username:     body.ownerUsername.toLowerCase(),
+          phone:        body.ownerPhone || null,
           email:        body.ownerEmail,
           passwordHash,
           role:         'OWNER',
           isActive:     true,
         },
-        select: { id: true, name: true, phone: true, email: true, role: true },
+        select: { id: true, name: true, username: true, phone: true, email: true, role: true },
       });
 
-      return { tenant, owner };
+      return { tenant, group, owner };
     });
 
     return res.status(201).json(result);
