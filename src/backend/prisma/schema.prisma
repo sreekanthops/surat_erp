@@ -68,15 +68,16 @@ model Group {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  users            User[]
-  parties          Party[]
-  products         Product[]
-  godowns          Godown[]
-  transactions     Transaction[]
-  stockMovements   StockMovement[]
-  messages         Message[]
-  leads            Lead[]
-  cashFlowDaily    CashFlowDaily[]
+  users              User[]
+  parties            Party[]
+  products           Product[]
+  godowns            Godown[]
+  transactions       Transaction[]
+  stockMovements     StockMovement[]
+  messages           Message[]
+  leads              Lead[]
+  cashFlowDaily      CashFlowDaily[]
+  integrationConfigs IntegrationConfig[]
 
   @@unique([tenantId, name])
   @@map("groups")
@@ -558,13 +559,15 @@ model IntegrationConfig {
   id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId     String          @db.Uuid
   tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  groupId      String?         @db.Uuid
+  group        Group?          @relation(fields: [groupId], references: [id], onDelete: Cascade)
   type         IntegrationType
   config       Json            @default("{}")
   isActive     Boolean         @default(false)
   lastSyncAt   DateTime?
   syncStatus   String?         @db.VarChar(20)
 
-  @@unique([tenantId, type])
+  @@index([tenantId, groupId, type])
   @@map("integration_configs")
 }
 

@@ -1,0 +1,181 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Multi-Tenant RBAC Plan — TextileIQ</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.6; background: #fff; color: #1f2328; }
+  .page { max-width: 760px; margin: 0 auto; padding: 40px 24px 60px; }
+  h1 { font-size: 22px; font-weight: 800; color: #1f2328; margin-bottom: 4px; }
+  .subtitle { color: #57606a; font-size: 13.5px; margin-bottom: 32px; }
+  h2 { font-size: 15px; font-weight: 700; color: #1f2328; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
+  h3 { font-size: 13px; font-weight: 700; color: #3b82d4; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .06em; }
+  p { margin-bottom: 8px; color: #374151; font-size: 13.5px; }
+  ul, ol { padding-left: 20px; margin-bottom: 10px; }
+  li { font-size: 13.5px; color: #374151; margin-bottom: 3px; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px 5px; color: #5b5bd6; }
+  .badge { display: inline-block; border-radius: 5px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; }
+  .badge-owner   { background: #ede9fe; color: #5b21b6; }
+  .badge-mgr     { background: #dbeafe; color: #1e40af; }
+  .badge-acct    { background: #d1fae5; color: #065f46; }
+  .badge-staff   { background: #fef3c7; color: #92400e; }
+  .badge-ro      { background: #f3f4f6; color: #374151; }
+  .badge-no      { background: #fee2e2; color: #991b1b; }
+  .badge-p { background: #ede9fe; color: #5b21b6; }
+  .badge-b { background: #dbeafe; color: #1e40af; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+  th { background: #f7f8fa; text-align: left; padding: 7px 10px; border: 1px solid #e5e7eb; font-weight: 700; color: #374151; }
+  td { padding: 6px 10px; border: 1px solid #e5e7eb; color: #374151; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .phase { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; padding: 14px 16px; border-radius: 10px; border: 1px solid #e5e7eb; background: #f7f8fa; }
+  .phase-num { min-width: 32px; height: 32px; border-radius: 50%; background: #5b5bd6; color: #fff; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .phase-content h3 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #1f2328; text-transform: none; letter-spacing: 0; }
+  .phase-content p { margin: 0; font-size: 13px; color: #57606a; }
+  .problem-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+  .problem-box p { color: #7f1d1d; margin: 0; font-size: 13px; }
+  .fix-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+  .fix-box p { color: #14532d; margin: 0; font-size: 13px; }
+  footer { margin-top: 48px; padding-top: 14px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Multi-Tenant RBAC Plan</h1>
+  <p class="subtitle">TextileIQ — Tenant isolation, role-based access, Gmail/WhatsApp sharing by owner</p>
+
+  
+  <h2>What's Wrong Today</h2>
+  <div class="problem-box">
+    <p>
+      <strong>1. Gmail appears connected for every new user</strong> — <code>IntegrationConfig</code> is scoped to <code>tenantId</code>, not to a specific user. Any new user in the same tenant immediately sees the owner's Gmail as "connected" — this is actually correct data-sharing behaviour, but the UI doesn't gate who can <em>change</em> it.<br /><br />
+      <strong>2. No real RBAC on API routes</strong> — <code>requireRole</code> middleware exists but is only applied to a few integration routes. Any logged-in user (STAFF, READONLY) can call <code>POST /api/v1/inventory</code>, <code>DELETE /api/v1/parties/:id</code>, etc.<br /><br />
+      <strong>3. No UI permission gating</strong> — buttons like Add Product, Delete Party, Configure Gmail are shown to all roles regardless.
+    </p>
+  </div>
+
+  
+  <h2>How Tenancy Already Works (No Schema Change Needed)</h2>
+  <p>The schema already has everything needed:</p>
+  <ul>
+    <li><strong>Tenant</strong> = the company (e.g. "Sharma Textiles Pvt Ltd"). One per customer.</li>
+    <li><strong>Group</strong> = optional sub-division within a tenant (e.g. "Wholesale Team", "Retail Branch"). Optional — most small companies won't use it.</li>
+    <li><strong>User</strong> → belongs to a Tenant, optionally to a Group. Has a <code>role</code> field (<code>OWNER | MANAGER | ACCOUNTANT | STAFF | READONLY</code>).</li>
+    <li><strong>IntegrationConfig</strong> → scoped to <code>tenantId</code>. One Gmail config per tenant. All users of that tenant share it automatically. <strong>Only OWNER can modify it.</strong></li>
+  </ul>
+  <div class="fix-box">
+    <p>✅ Gmail/WhatsApp sharing is already correct at the data layer. The fix is purely access control: <strong>only the tenant OWNER can connect/disconnect/reconfigure integrations</strong>. All other roles see status (connected/not connected) but cannot change it.</p>
+  </div>
+
+  
+  <h2>Role Permission Matrix</h2>
+  <p>Industry standard for multi-user SaaS ERP (based on Zoho Books, Vyapar, TallyPrime, QuickBooks):</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Feature Area</th>
+        <th><span class="badge badge-owner">OWNER</span></th>
+        <th><span class="badge badge-mgr">MANAGER</span></th>
+        <th><span class="badge badge-acct">ACCOUNTANT</span></th>
+        <th><span class="badge badge-staff">STAFF</span></th>
+        <th><span class="badge badge-ro">READONLY</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Inventory — View</strong></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td><strong>Inventory — Add / Edit product</strong></td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Inventory — Delete product</strong></td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Stock Inward / Adjust / Transfer</strong></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+      <tr><td><strong>Sales — View invoices</strong></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td><strong>Sales — Create / Edit invoice</strong></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+      <tr><td><strong>Sales — Delete invoice</strong></td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Parties — View</strong></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td><strong>Parties — Add / Edit</strong></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+      <tr><td><strong>Parties — Delete</strong></td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Leads — View / Add / Edit</strong></td><td>✅</td><td>✅</td><td>❌</td><td>✅</td><td>✅ (view)</td></tr>
+      <tr><td><strong>Leads — Delete</strong></td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Reports — View all</strong></td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Gmail / WhatsApp — View inbox</strong></td><td>✅</td><td>✅</td><td>❌</td><td>✅</td><td>❌</td></tr>
+      <tr><td><strong>Gmail / WhatsApp — Configure</strong></td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Settings — Company profile</strong></td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Settings — Create / manage users</strong></td><td>✅</td><td>✅ (no owner)</td><td>❌</td><td>❌</td><td>❌</td></tr>
+      <tr><td><strong>Settings — Subscription / billing</strong></td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+    </tbody>
+  </table>
+
+  
+  <h2>Implementation Phases</h2>
+
+  <div class="phase">
+    <div class="phase-num">1</div>
+    <div class="phase-content">
+      <h3>Phase 1 — Backend Permission Middleware</h3>
+      <p>Create a <code>requirePermission(action)</code> middleware that reads <code>req.user.role</code> from the JWT and checks against a permissions map. Apply it to every mutating route (<code>POST</code>, <code>PUT</code>, <code>DELETE</code>). No schema change. Touch: <code>src/backend/src/middleware/permissions.ts</code> (new file) + all 6 route files.</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-num">2</div>
+    <div class="phase-content">
+      <h3>Phase 2 — Integration Routes: Owner-Only Gate</h3>
+      <p>Lock <code>POST /api/v1/integrations/gmail/connect</code>, <code>/disconnect</code>, <code>/whatsapp/connect</code> etc. to <code>OWNER</code> role only. All other roles can <code>GET</code> status but cannot <code>POST</code>/<code>DELETE</code>. Touch: <code>integrations.ts</code>.</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-num">3</div>
+    <div class="phase-content">
+      <h3>Phase 3 — Return role in JWT / /me endpoint</h3>
+      <p>Ensure <code>role</code> is included in the JWT payload and in the <code>GET /api/v1/auth/me</code> response. The frontend needs it to gate UI. Touch: <code>auth.ts</code> route + <code>authMiddleware.ts</code>.</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-num">4</div>
+    <div class="phase-content">
+      <h3>Phase 4 — Frontend Permission Hook</h3>
+      <p>Add a <code>usePermissions()</code> hook that reads <code>role</code> from auth context and exposes boolean helpers: <code>canEdit</code>, <code>canDelete</code>, <code>canConfigureIntegrations</code>, etc. Touch: <code>src/frontend/src/hooks/usePermissions.ts</code> (new).</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-num">5</div>
+    <div class="phase-content">
+      <h3>Phase 5 — Gate UI buttons by role</h3>
+      <p>Use <code>usePermissions()</code> in each page to conditionally render Add/Edit/Delete buttons and the Settings → Integrations section. Touch: <code>InventoryPage</code>, <code>SalesPage</code>, <code>PartiesPage</code>, <code>LeadsPage</code>, <code>SettingsPage</code>.</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-num">6</div>
+    <div class="phase-content">
+      <h3>Phase 6 — User Management UI (Settings)</h3>
+      <p>Add a "Team" tab to Settings where OWNER/MANAGER can invite users, assign roles, activate/deactivate. Backend: <code>GET/POST/PUT/DELETE /api/v1/users</code> (scoped to tenantId). Touch: <code>SettingsPage.tsx</code> + new <code>users.ts</code> route.</p>
+    </div>
+  </div>
+
+  
+  <h2>What Stays the Same</h2>
+  <ul>
+    <li>No schema changes needed — <code>UserRole</code> enum and <code>IntegrationConfig.tenantId</code> are already correct.</li>
+    <li>Data isolation is already correct — every query is already scoped by <code>tenantId</code>.</li>
+    <li>Gmail tokens are already per-tenant — all users of a tenant already see the same connected Gmail. Just need to hide the Connect/Disconnect button from non-OWNER roles.</li>
+    <li>No migration needed — the <code>role</code> column already exists on <code>users</code>.</li>
+  </ul>
+
+  
+  <h2>Recommended Build Order</h2>
+  <ol>
+    <li><strong>Phase 1 + 2</strong> together — backend permissions middleware + owner-only integration gates (one PR)</li>
+    <li><strong>Phase 3</strong> — role in JWT/me (small, unblocks frontend)</li>
+    <li><strong>Phase 4 + 5</strong> together — frontend hook + gate all UI buttons (one PR)</li>
+    <li><strong>Phase 6</strong> — User management UI (largest, standalone PR)</li>
+  </ol>
+
+  <footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>

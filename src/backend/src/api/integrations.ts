@@ -86,16 +86,25 @@ integrationsRouter.get('/app-credentials', requirePermission('integrations:view'
 // ── GET /api/v1/integrations/status ──────────────────────────────────────────
 integrationsRouter.get('/status', async (req, res, next) => {
   try {
-    const tenantId = (req as any).user.tenantId;
+    const { tenantId, groupId } = (req as any).user;
 
-    const configs = await prisma.integrationConfig.findMany({
-      where: { tenantId },
-      select: { type: true, isActive: true, lastSyncAt: true, syncStatus: true, config: true },
-    });
+    // Gmail is group-scoped; WhatsApp/others are tenant-scoped
+    const [tenantConfigs, gmailConfig] = await Promise.all([
+      prisma.integrationConfig.findMany({
+        where: { tenantId, groupId: null },
+        select: { type: true, isActive: true, lastSyncAt: true, syncStatus: true, config: true },
+      }),
+      groupId
+        ? prisma.integrationConfig.findFirst({
+            where: { tenantId, groupId, type: 'GMAIL' },
+            select: { type: true, isActive: true, lastSyncAt: true, syncStatus: true, config: true },
+          })
+        : null,
+    ]);
 
-    const statusMap = Object.fromEntries(configs.map((c) => [c.type.toLowerCase(), c]));
+    const statusMap = Object.fromEntries(tenantConfigs.map((c) => [c.type.toLowerCase(), c]));
 
-    // Strip sensitive fields from config before sending to frontend
+    // Strip sensitive fields from WhatsApp config
     const safeWa = statusMap['whatsapp'];
     if (safeWa?.config) {
       const cfg = safeWa.config as any;
@@ -109,9 +118,15 @@ integrationsRouter.get('/status', async (req, res, next) => {
       };
     }
 
+    // Gmail status: use group-scoped config if user is in a group, else tenant-level fallback
+    const gmailRow = gmailConfig ?? (statusMap['gmail'] || null);
+    const safeGmail = gmailRow
+      ? { isActive: gmailRow.isActive, syncStatus: gmailRow.syncStatus, lastSyncAt: gmailRow.lastSyncAt, config: { email: (gmailRow.config as any)?.email, hasToken: !!(gmailRow.config as any)?.accessToken } }
+      : { isActive: false };
+
     return res.json({
       whatsapp: safeWa ?? { isActive: false, config: {} },
-      gmail: statusMap['gmail'] ?? { isActive: false },
+      gmail: safeGmail,
       tally: statusMap['tally'] ?? { isActive: false },
       marg: statusMap['marg'] ?? { isActive: false },
       busy: statusMap['busy'] ?? { isActive: false },
@@ -264,10 +279,13 @@ integrationsRouter.post('/tally/sync', async (req, res, next) => {
 // OWNER / MANAGER only
 integrationsRouter.get('/gmail/connect', requirePermission('integrations:configure'), async (req, res, next) => {
   try {
-    const tenantId = (req as any).user.tenantId;
+    const { tenantId, groupId } = (req as any).user;
+    if (!groupId) return res.status(400).json({ error: 'You must belong to a group to connect Gmail.' });
     const { clientId } = getGoogleCreds();
     if (!clientId) return res.status(400).json({ error: 'Gmail is not configured on this server. Contact your administrator.' });
     const oauth2 = getOAuthClient();
+    // Encode both tenantId and groupId in state so callback knows where to save
+    const state = `${tenantId}|${groupId}`;
     const url = oauth2.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
@@ -276,7 +294,7 @@ integrationsRouter.get('/gmail/connect', requirePermission('integrations:configu
         'https://www.googleapis.com/auth/gmail.send',
         'https://www.googleapis.com/auth/userinfo.email',
       ],
-      state: tenantId,
+      state,
     });
     return res.json({ url });
   } catch (err) {
@@ -289,9 +307,13 @@ integrationsRouter.get('/gmail/connect', requirePermission('integrations:configu
 // Mounted PUBLIC (before authMiddleware) in index.ts — no JWT present.
 gmailCallbackRouter.get('/', async (req, res, next) => {
   try {
-    const { code, state: tenantId, error } = req.query as Record<string, string>;
+    const { code, state, error } = req.query as Record<string, string>;
     if (error) return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?error=${encodeURIComponent(error)}`);
-    if (!code || !tenantId) return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?error=missing_params`);
+    if (!code || !state) return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?error=missing_params`);
+
+    // state = "tenantId|groupId"
+    const [tenantId, groupId] = state.split('|');
+    if (!tenantId || !groupId) return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?error=invalid_state`);
 
     const oauth2 = getOAuthClient();
     const { tokens } = await oauth2.getToken(code);
@@ -302,32 +324,39 @@ gmailCallbackRouter.get('/', async (req, res, next) => {
     const { data: profile } = await oauth2Info.userinfo.get();
     const email = profile.email || '';
 
-    // Store only OAuth tokens — no per-tenant credentials needed
-    await prisma.integrationConfig.upsert({
-      where: { tenantId_type: { tenantId, type: 'GMAIL' } },
-      update: {
-        isActive: true, syncStatus: 'connected', lastSyncAt: new Date(),
-        config: { email, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiryDate: tokens.expiry_date },
-      },
-      create: {
-        tenantId, type: 'GMAIL', isActive: true, syncStatus: 'connected', lastSyncAt: new Date(),
-        config: { email, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiryDate: tokens.expiry_date },
-      },
-    });
+    // Store tokens scoped to this group (manual upsert — groupId is nullable so compound unique is handled via findFirst)
+    const existing = await prisma.integrationConfig.findFirst({ where: { tenantId, groupId, type: 'GMAIL' } });
+    if (existing) {
+      await prisma.integrationConfig.update({
+        where: { id: existing.id },
+        data: {
+          isActive: true, syncStatus: 'connected', lastSyncAt: new Date(),
+          config: { email, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiryDate: tokens.expiry_date },
+        },
+      });
+    } else {
+      await prisma.integrationConfig.create({
+        data: {
+          tenantId, groupId, type: 'GMAIL', isActive: true, syncStatus: 'connected', lastSyncAt: new Date(),
+          config: { email, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiryDate: tokens.expiry_date },
+        },
+      });
+    }
 
-    return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?connected=1`);
+    return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/gmail?connected=1`);
   } catch (err: any) {
     const msg = err?.message || 'OAuth error';
-    return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/settings?error=${encodeURIComponent(msg)}`);
+    return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/gmail?error=${encodeURIComponent(msg)}`);
   }
 });
 
 // ── DELETE /api/v1/integrations/gmail/disconnect ──────────────────────────────
 integrationsRouter.delete('/gmail/disconnect', requirePermission('integrations:configure'), async (req, res, next) => {
   try {
-    const tenantId = (req as any).user.tenantId;
+    const { tenantId, groupId } = (req as any).user;
+    if (!groupId) return res.status(400).json({ error: 'You must belong to a group to disconnect Gmail.' });
     await prisma.integrationConfig.updateMany({
-      where: { tenantId, type: 'GMAIL' },
+      where: { tenantId, groupId, type: 'GMAIL' },
       data: { isActive: false, syncStatus: 'disconnected', config: {} },
     });
     return res.json({ ok: true });
@@ -340,12 +369,13 @@ integrationsRouter.delete('/gmail/disconnect', requirePermission('integrations:c
 // Fetches latest emails from Gmail and stores them as Messages in the DB
 integrationsRouter.post('/gmail/sync', async (req, res, next) => {
   try {
-    const tenantId = (req as any).user.tenantId;
+    const { tenantId, groupId } = (req as any).user;
+    if (!groupId) return res.status(400).json({ error: 'You must belong to a group to sync Gmail.' });
     // max = total emails to fetch across all pages; default 200, hard cap 500
     const maxResults = Math.min(parseInt(String(req.query.max || '200')), 500);
 
-    const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL', isActive: true } });
-    if (!cfg) return res.status(400).json({ error: 'Gmail not connected. Connect Gmail first.' });
+    const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, groupId, type: 'GMAIL', isActive: true } });
+    if (!cfg) return res.status(400).json({ error: 'Gmail not connected for your group. Ask your Manager or Owner to connect Gmail.' });
 
     const { accessToken, refreshToken, expiryDate, email: connectedEmail } = cfg.config as any;
     const oauth2 = getOAuthClient();
@@ -357,7 +387,7 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
     // Persist refreshed token
     if (credentials.access_token !== accessToken || credentials.refresh_token) {
       await prisma.integrationConfig.updateMany({
-        where: { tenantId, type: 'GMAIL' },
+        where: { tenantId, groupId, type: 'GMAIL' },
         data: {
           lastSyncAt: new Date(),
           config: { email: connectedEmail, accessToken: credentials.access_token, refreshToken: credentials.refresh_token || refreshToken, expiryDate: credentials.expiry_date },
@@ -386,9 +416,9 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
 
     if (ids.length === 0) return res.json({ synced: 0, total: 0 });
 
-    // Check which message IDs are already stored
+    // Check which message IDs are already stored (scoped to this group)
     const existing = await prisma.message.findMany({
-      where: { tenantId, channel: 'GMAIL', externalId: { in: ids } },
+      where: { tenantId, groupId, channel: 'GMAIL', externalId: { in: ids } },
       select: { externalId: true },
     });
     const existingIds = new Set(existing.map((m) => m.externalId));
@@ -426,22 +456,23 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
         const fromEmail = (from.match(/<([^>]+)>/) || [])[1] || from.trim();
         const fromName  = (from.match(/^([^<]+)</) || [])[1]?.trim() || fromEmail;
 
-        // Find or create party by email
-        let party = await prisma.party.findFirst({ where: { tenantId, email: fromEmail } });
+        // Find or create party by email — scoped to this group
+        let party = await prisma.party.findFirst({ where: { tenantId, groupId, email: fromEmail } });
         if (!party && fromEmail && fromEmail !== connectedEmail) {
           party = await prisma.party.upsert({
             where: { id: '00000000-0000-0000-0000-000000000000' }, // dummy — always goes to create
             update: {},
-            create: { tenantId, name: fromName || fromEmail, email: fromEmail, type: 'CUSTOMER' },
+            create: { tenantId, groupId, name: fromName || fromEmail, email: fromEmail, type: 'CUSTOMER' },
           }).catch(() => null);
           if (!party) {
-            party = await prisma.party.findFirst({ where: { tenantId, email: fromEmail } });
+            party = await prisma.party.findFirst({ where: { tenantId, groupId, email: fromEmail } });
           }
         }
 
         await prisma.message.create({
           data: {
             tenantId,
+            groupId,
             partyId:     party?.id,
             channel:     'GMAIL',
             direction:   'INBOUND',
@@ -465,7 +496,8 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
     return res.json({ synced, total: ids.length, skipped: ids.length - synced });
   } catch (err: any) {
     if (err?.code === 401 || err?.status === 401) {
-      await prisma.integrationConfig.updateMany({ where: { tenantId: (req as any).user.tenantId, type: 'GMAIL' }, data: { isActive: false, syncStatus: 'token_expired' } });
+      const { tenantId, groupId } = (req as any).user;
+      await prisma.integrationConfig.updateMany({ where: { tenantId, groupId, type: 'GMAIL' }, data: { isActive: false, syncStatus: 'token_expired' } });
       return res.status(401).json({ error: 'Gmail token expired. Please reconnect.' });
     }
     next(err);
@@ -476,12 +508,13 @@ integrationsRouter.post('/gmail/sync', async (req, res, next) => {
 // Send a reply email via the connected Gmail account
 integrationsRouter.post('/gmail/reply', async (req, res, next) => {
   try {
-    const tenantId = (req as any).user.tenantId;
+    const { tenantId, groupId } = (req as any).user;
+    if (!groupId) return res.status(400).json({ error: 'You must belong to a group to send email.' });
     const { to, subject, body, threadId, inReplyTo } = req.body;
     if (!to || !body) return res.status(400).json({ error: 'to and body are required' });
 
-    const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL', isActive: true } });
-    if (!cfg) return res.status(400).json({ error: 'Gmail not connected' });
+    const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, groupId, type: 'GMAIL', isActive: true } });
+    if (!cfg) return res.status(400).json({ error: 'Gmail not connected for your group.' });
 
     const { accessToken, refreshToken, expiryDate, email: connectedEmail } = cfg.config as any;
     const oauth2 = getOAuthClient();
@@ -510,10 +543,10 @@ integrationsRouter.post('/gmail/reply', async (req, res, next) => {
       requestBody: { raw: encoded, threadId: threadId || undefined },
     });
 
-    // Store outbound message
+    // Store outbound message scoped to this group
     await prisma.message.create({
       data: {
-        tenantId, channel: 'GMAIL', direction: 'OUTBOUND',
+        tenantId, groupId, channel: 'GMAIL', direction: 'OUTBOUND',
         fromAddress: connectedEmail, toAddress: to,
         subject: replySubject, content: body,
         threadId: sent.data.threadId || threadId,
@@ -532,12 +565,13 @@ integrationsRouter.post('/gmail/reply', async (req, res, next) => {
 // Send a fresh new email via connected Gmail account
 integrationsRouter.post('/gmail/compose', async (req, res, next) => {
   try {
-    const tenantId = (req as any).user.tenantId;
+    const { tenantId, groupId } = (req as any).user;
+    if (!groupId) return res.status(400).json({ error: 'You must belong to a group to send email.' });
     const { to, subject, body } = req.body;
     if (!to || !body || !subject) return res.status(400).json({ error: 'to, subject, and body are required' });
 
-    const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, type: 'GMAIL', isActive: true } });
-    if (!cfg) return res.status(400).json({ error: 'Gmail not connected. Please connect your Gmail first.' });
+    const cfg = await prisma.integrationConfig.findFirst({ where: { tenantId, groupId, type: 'GMAIL', isActive: true } });
+    if (!cfg) return res.status(400).json({ error: 'Gmail not connected for your group. Ask your Manager or Owner to connect Gmail.' });
 
     const { accessToken, refreshToken, expiryDate, email: connectedEmail } = cfg.config as any;
     const oauth2 = getOAuthClient();
@@ -563,19 +597,20 @@ integrationsRouter.post('/gmail/compose', async (req, res, next) => {
       requestBody: { raw: encoded },
     });
 
-    // Find or create party if needed
+    // Find or create party scoped to this group
     const toEmail = (to.match(/<([^>]+)>/) || [])[1] || to.trim();
-    let party = await prisma.party.findFirst({ where: { tenantId, email: toEmail } });
+    let party = await prisma.party.findFirst({ where: { tenantId, groupId, email: toEmail } });
     if (!party && toEmail) {
       party = await prisma.party.create({
-        data: { tenantId, name: toEmail, email: toEmail, type: 'CUSTOMER' },
+        data: { tenantId, groupId, name: toEmail, email: toEmail, type: 'CUSTOMER' },
       }).catch(() => null);
     }
 
-    // Store outbound message
+    // Store outbound message scoped to this group
     const msg = await prisma.message.create({
       data: {
         tenantId,
+        groupId,
         partyId: party?.id,
         channel: 'GMAIL',
         direction: 'OUTBOUND',
@@ -600,11 +635,14 @@ integrationsRouter.post('/gmail/compose', async (req, res, next) => {
 // Paginated list of Gmail messages stored in DB
 integrationsRouter.get('/gmail/inbox', async (req, res, next) => {
   try {
-    const tenantId = (req as any).user.tenantId;
+    const { tenantId, groupId } = (req as any).user;
+    if (!groupId) return res.json({ data: [], total: 0, page: 1 });
+
     const { page = '1', limit = '30', unread, search } = req.query as Record<string, string>;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const where: any = { tenantId, channel: 'GMAIL', direction: 'INBOUND' };
+    // Strict group isolation: only show messages belonging to this group
+    const where: any = { tenantId, groupId, channel: 'GMAIL', direction: 'INBOUND' };
     if (unread === 'true') where.isRead = false;
     if (search?.trim()) {
       where.OR = [

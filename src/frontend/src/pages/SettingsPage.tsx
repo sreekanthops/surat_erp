@@ -707,7 +707,7 @@ function TeamSection({ callerRole }: { callerRole: string }) {
 
 export default function SettingsPage() {
   const user = useAuthStore(s => s.user);
-  const { canViewIntegrations, canConfigureIntegrations, canViewUsers } = usePermissions();
+  const { canConfigureIntegrations, canViewUsers } = usePermissions();
   const [tab, setTab] = useState<'integrations' | 'profile' | 'team'>('integrations');
   const [waStatus, setWaStatus] = useState<WaStatus | null>(null);
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null);
@@ -730,7 +730,7 @@ export default function SettingsPage() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!canViewIntegrations) return;
+    if (!canConfigureIntegrations) return;
     setLoading(true);
     try {
       const [statusRes, credsRes] = await Promise.all([
@@ -745,7 +745,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [canViewIntegrations]);
+  }, [canConfigureIntegrations]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -760,14 +760,14 @@ export default function SettingsPage() {
       </div>
 
       <div style={S.tabs}>
-        {canViewIntegrations && <Tab label="Integrations" active={tab === 'integrations'} onClick={() => setTab('integrations')} />}
+        {canConfigureIntegrations && <Tab label="Integrations" active={tab === 'integrations'} onClick={() => setTab('integrations')} />}
         {canViewUsers && <Tab label="Team" active={tab === 'team'} onClick={() => setTab('team')} />}
         <Tab label="Profile" active={tab === 'profile'} onClick={() => setTab('profile')} />
       </div>
 
       <div style={{ maxWidth: '720px' }}>
         {tab === 'integrations' && (
-          canViewIntegrations ? (
+          canConfigureIntegrations ? (
             loading ? (
               <div style={{ color: '#9ca3af', fontSize: '13px', padding: '24px 0' }}>Loading integration status…</div>
             ) : (

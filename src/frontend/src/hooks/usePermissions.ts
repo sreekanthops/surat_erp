@@ -46,7 +46,7 @@ export function usePermissions() {
     canDeleteLeads:         r >= ROLE_RANK.MANAGER,
 
     // Integrations
-    canViewIntegrations:      r >= ROLE_RANK.MANAGER,   // MANAGER + OWNER + SUPER_ADMIN see status
+    canViewIntegrations:      r >= ROLE_RANK.READONLY,  // ALL roles can view Gmail inbox
     canConfigureIntegrations: r >= ROLE_RANK.MANAGER,   // MANAGER + OWNER can connect/disconnect
 
     // Reports

@@ -1,0 +1,248 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Inventory Feature Plan — TextileIQ</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;background:#fff;color:#1f2328;padding:32px 24px;max-width:760px;margin:0 auto}
+  h1{font-size:22px;font-weight:800;color:#1f2328;letter-spacing:-0.03em;margin-bottom:4px}
+  .subtitle{font-size:13px;color:#57606a;margin-bottom:28px}
+  h2{font-size:13px;font-weight:700;color:#57606a;text-transform:uppercase;letter-spacing:0.06em;margin:28px 0 12px}
+  .section{margin-bottom:28px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .card{border:1px solid #e5e7eb;border-radius:10px;padding:13px 15px}
+  .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-right:4px;margin-bottom:3px}
+  .tag-green{background:#ecfdf5;color:#059669}
+  .tag-yellow{background:#fffbeb;color:#d97706}
+  .tag-red{background:#fef2f2;color:#dc2626}
+  .tag-blue{background:#eff6ff;color:#2563eb}
+  .tag-gray{background:#f3f4f6;color:#6b7280}
+  .feature-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f3f4f6}
+  .feature-row:last-child{border-bottom:none}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px}
+  .dot-green{background:#10b981}
+  .dot-yellow{background:#f59e0b}
+  .dot-red{background:#ef4444}
+  .feature-name{font-weight:600;font-size:13px;color:#1f2328}
+  .feature-desc{font-size:12px;color:#57606a;margin-top:1px}
+  .priority-block{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .priority-header{padding:10px 14px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:8px}
+  .p1-header{background:#fef2f2;color:#dc2626;border-bottom:1px solid #fecaca}
+  .p2-header{background:#fffbeb;color:#d97706;border-bottom:1px solid #fde68a}
+  .p3-header{background:#eff6ff;color:#2563eb;border-bottom:1px solid #bfdbfe}
+  .priority-body{padding:6px 14px}
+  .prow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f9fafb}
+  .prow:last-child{border-bottom:none}
+  .pnum{font-size:11px;font-weight:700;color:#9ca3af;min-width:24px;padding-top:2px}
+  .ptitle{font-size:13px;font-weight:600;color:#1f2328}
+  .pdesc{font-size:12px;color:#57606a;margin-top:1px}
+  .ptags{margin-top:4px}
+  .divider{border:none;border-top:1px solid #e5e7eb;margin:24px 0}
+  .status-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .status-table th{text-align:left;padding:8px 12px;background:#f7f8fa;font-size:11px;font-weight:700;color:#57606a;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb}
+  .status-table td{padding:8px 12px;border-bottom:1px solid #f3f4f6;vertical-align:top}
+  .status-table tr:last-child td{border-bottom:none}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af}
+</style>
+</head>
+<body>
+
+<h1>Inventory &amp; Stock — Feature Plan</h1>
+<p class="subtitle">TextileIQ · Complete audit + prioritized roadmap · October 2026</p>
+
+
+<h2>Current State — What's Built</h2>
+<div class="section">
+  <div class="grid">
+    <div class="card">
+      <div class="card-label" style="color:#059669">✅ Fully Working</div>
+      <div class="feature-row"><div class="dot dot-green"></div><div><div class="feature-name">Product CRUD</div><div class="feature-desc">Create, edit, delete (soft), search, category filter</div></div></div>
+      <div class="feature-row"><div class="dot dot-green"></div><div><div class="feature-name">Pricing Fields</div><div class="feature-desc">Purchase rate, sale rate, GST %, HSN code</div></div></div>
+      <div class="feature-row"><div class="dot dot-green"></div><div><div class="feature-name">Stock Level Display</div><div class="feature-desc">Current stock badge with low/out-of-stock colors</div></div></div>
+      <div class="feature-row"><div class="dot dot-green"></div><div><div class="feature-name">Reorder Level Alert</div><div class="feature-desc">Low stock count in summary cards</div></div></div>
+      <div class="feature-row"><div class="dot dot-green"></div><div><div class="feature-name">Multi-Unit Support</div><div class="feature-desc">METER, KG, PIECE, BUNDLE, BOX, ROLL</div></div></div>
+      <div class="feature-row"><div class="dot dot-green"></div><div><div class="feature-name">Summary Cards</div><div class="feature-desc">Total products, stock value, low stock, out of stock</div></div></div>
+      <div class="feature-row"><div class="dot dot-green"></div><div><div class="feature-name">Auto Stock Deduct</div><div class="feature-desc">Sales invoices reduce currentStock automatically</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-label" style="color:#d97706">⚠️ Partially Built (DB exists, no UI)</div>
+      <div class="feature-row"><div class="dot dot-yellow"></div><div><div class="feature-name">Stock Movements</div><div class="feature-desc">Model exists with 9 types — no UI to view or create</div></div></div>
+      <div class="feature-row"><div class="dot dot-yellow"></div><div><div class="feature-name">Godown / Warehouse</div><div class="feature-desc">DB model exists — not exposed in inventory routes</div></div></div>
+      <div class="feature-row"><div class="dot dot-yellow"></div><div><div class="feature-name">Batch / Lot Tracking</div><div class="feature-desc">batchNo field in StockMovement — no management UI</div></div></div>
+      <div class="feature-row"><div class="dot dot-yellow"></div><div><div class="feature-name">Max Stock</div><div class="feature-desc">maxStock field in Product — not in form or logic</div></div></div>
+      <div class="feature-row"><div class="dot dot-yellow"></div><div><div class="feature-name">RETURN_IN / RETURN_OUT</div><div class="feature-desc">Movement types defined — no purchase return flow</div></div></div>
+      <div class="feature-row"><div class="dot dot-red"></div><div><div class="feature-name">Stock Movement History</div><div class="feature-desc">Per-product history — backend route exists, no UI tab</div></div></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider" />
+
+
+<h2>Missing Features — Full Audit</h2>
+<table class="status-table">
+  <thead>
+    <tr><th>Feature</th><th>What's needed</th><th>Priority</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Stock Movement History</strong></td>
+      <td>Tab/drawer per product showing all IN/OUT movements with date, type, qty, rate, notes</td>
+      <td><span class="tag tag-red">P1</span></td>
+    </tr>
+    <tr>
+      <td><strong>Manual Stock Adjustment</strong></td>
+      <td>Button to add/remove stock with reason (ADJUSTMENT, DAMAGE, SAMPLE, OPENING) and notes</td>
+      <td><span class="tag tag-red">P1</span></td>
+    </tr>
+    <tr>
+      <td><strong>Stock Inward (Purchase Entry)</strong></td>
+      <td>Record purchase/restocking without full invoice — adds PURCHASE movement, updates stock</td>
+      <td><span class="tag tag-red">P1</span></td>
+    </tr>
+    <tr>
+      <td><strong>Low Stock Alerts Page</strong></td>
+      <td>Dedicated view of all items below reorder level with quick restock action</td>
+      <td><span class="tag tag-red">P1</span></td>
+    </tr>
+    <tr>
+      <td><strong>Pagination in Product List</strong></td>
+      <td>Currently hardcoded limit:20 — need prev/next + per-page dropdown like SalesPage</td>
+      <td><span class="tag tag-red">P1</span></td>
+    </tr>
+    <tr>
+      <td><strong>Stock Valuation Report</strong></td>
+      <td>Total value at purchase rate vs sale rate, margin per product</td>
+      <td><span class="tag tag-yellow">P2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Export Products (CSV/Excel)</strong></td>
+      <td>Download full product list with stock levels and pricing</td>
+      <td><span class="tag tag-yellow">P2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Bulk Import (CSV)</strong></td>
+      <td>Upload CSV to create/update multiple products at once</td>
+      <td><span class="tag tag-yellow">P2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Max Stock + Overstock Alert</strong></td>
+      <td>Set max stock limit per product, warn when stock exceeds it</td>
+      <td><span class="tag tag-yellow">P2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Purchase Returns</strong></td>
+      <td>Record items sent back to supplier (RETURN_OUT movement)</td>
+      <td><span class="tag tag-yellow">P2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Sales Returns</strong></td>
+      <td>Record customer returns (RETURN_IN movement, restores stock)</td>
+      <td><span class="tag tag-yellow">P2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Godown / Warehouse Filter</strong></td>
+      <td>Show stock per warehouse, filter inventory by location</td>
+      <td><span class="tag tag-yellow">P2</span></td>
+    </tr>
+    <tr>
+      <td><strong>Stock Transfer Between Godowns</strong></td>
+      <td>Move qty from one warehouse to another (TRANSFER_IN + TRANSFER_OUT pair)</td>
+      <td><span class="tag tag-blue">P3</span></td>
+    </tr>
+    <tr>
+      <td><strong>Batch / Lot Tracking</strong></td>
+      <td>Assign batch numbers to stock, track which batch is being consumed</td>
+      <td><span class="tag tag-blue">P3</span></td>
+    </tr>
+    <tr>
+      <td><strong>Barcode / QR Scan</strong></td>
+      <td>Scan product code to open edit modal or add movement</td>
+      <td><span class="tag tag-blue">P3</span></td>
+    </tr>
+    <tr>
+      <td><strong>Stock Aging Report</strong></td>
+      <td>Which products have not moved in 30/60/90 days</td>
+      <td><span class="tag tag-blue">P3</span></td>
+    </tr>
+    <tr>
+      <td><strong>Reorder Suggestions</strong></td>
+      <td>AI-suggested reorder qty based on sales velocity and reorder level</td>
+      <td><span class="tag tag-gray">P4</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<hr class="divider" />
+
+
+<h2>Build Order — Prioritized</h2>
+
+<div class="priority-block">
+  <div class="priority-header p1-header">🔴 P1 — Build Now (Core gaps)</div>
+  <div class="priority-body">
+    <div class="prow"><div class="pnum">1</div><div><div class="ptitle">Stock Movement History tab per product</div><div class="pdesc">Click a product → side drawer shows all IN/OUT history: date, type, qty, rate, balance running total</div><div class="ptags"><span class="tag tag-blue">backend: /inventory/movements already exists</span><span class="tag tag-red">frontend: new</span></div></div></div>
+    <div class="prow"><div class="pnum">2</div><div><div class="ptitle">Manual Stock Adjustment modal</div><div class="pdesc">"Adjust Stock" button → choose type (Damage / Sample / Correction / Opening), qty, notes → creates StockMovement + updates currentStock</div><div class="ptags"><span class="tag tag-red">backend: new POST /inventory/movements</span><span class="tag tag-red">frontend: new modal</span></div></div></div>
+    <div class="prow"><div class="pnum">3</div><div><div class="ptitle">Quick Stock Inward (Purchase)</div><div class="pdesc">Add stock directly from inventory page — party (supplier), qty, rate, date → creates PURCHASE movement, updates stock, creates transaction</div><div class="ptags"><span class="tag tag-red">backend: new endpoint</span><span class="tag tag-red">frontend: new modal</span></div></div></div>
+    <div class="prow"><div class="pnum">4</div><div><div class="ptitle">Pagination in product list</div><div class="pdesc">Same as SalesPage — prev/next, page numbers, 20/50/100 per page dropdown</div><div class="ptags"><span class="tag tag-yellow">backend: already supports page+limit</span><span class="tag tag-red">frontend: add UI</span></div></div></div>
+    <div class="prow"><div class="pnum">5</div><div><div class="ptitle">Low Stock tab / filtered view</div><div class="pdesc">Tab toggle "All | Low Stock | Out of Stock" — filters table instantly, no new API needed</div><div class="ptags"><span class="tag tag-yellow">frontend only</span></div></div></div>
+  </div>
+</div>
+
+<div class="priority-block">
+  <div class="priority-header p2-header">🟡 P2 — Build Next (Common needs)</div>
+  <div class="priority-body">
+    <div class="prow"><div class="pnum">6</div><div><div class="ptitle">Export Products to CSV/Excel</div><div class="pdesc">Download button → exports all products with name, code, category, stock, rates. Uses xlsx library already installed.</div><div class="ptags"><span class="tag tag-yellow">frontend only</span></div></div></div>
+    <div class="prow"><div class="pnum">7</div><div><div class="ptitle">Max Stock field + overstock warning</div><div class="pdesc">Add maxStock to edit form, show orange badge if currentStock &gt; maxStock</div><div class="ptags"><span class="tag tag-yellow">DB field exists</span><span class="tag tag-red">UI: add to form + badge</span></div></div></div>
+    <div class="prow"><div class="pnum">8</div><div><div class="ptitle">Sales Return (Customer Return)</div><div class="pdesc">From sales invoice → "Return" button → enter qty returned → RETURN_IN movement, stock restored, invoice updated</div><div class="ptags"><span class="tag tag-red">backend: new</span><span class="tag tag-red">frontend: new</span></div></div></div>
+    <div class="prow"><div class="pnum">9</div><div><div class="ptitle">Purchase Return (Return to Supplier)</div><div class="pdesc">Log qty sent back to supplier → RETURN_OUT movement, stock decremented</div><div class="ptags"><span class="tag tag-red">backend: new</span><span class="tag tag-red">frontend: new</span></div></div></div>
+    <div class="prow"><div class="pnum">10</div><div><div class="ptitle">Stock Valuation Report</div><div class="pdesc">Per product: stock × purchase rate = inventory cost. Total portfolio value, margin analysis.</div><div class="ptags"><span class="tag tag-red">backend: new report endpoint</span><span class="tag tag-red">frontend: new report tab</span></div></div></div>
+  </div>
+</div>
+
+<div class="priority-block">
+  <div class="priority-header p3-header">🔵 P3 — Future Sprints</div>
+  <div class="priority-body">
+    <div class="prow"><div class="pnum">11</div><div><div class="ptitle">Bulk Import via CSV</div><div class="pdesc">Upload CSV → preview → confirm → creates/updates products in bulk</div></div></div>
+    <div class="prow"><div class="pnum">12</div><div><div class="ptitle">Godown / Warehouse Inventory</div><div class="pdesc">Stock per location, filter by godown, show where each product is stored</div></div></div>
+    <div class="prow"><div class="pnum">13</div><div><div class="ptitle">Stock Transfer Between Godowns</div><div class="pdesc">TRANSFER_IN + TRANSFER_OUT pair, stock moves from one location to another</div></div></div>
+    <div class="prow"><div class="pnum">14</div><div><div class="ptitle">Batch / Lot Tracking</div><div class="pdesc">Assign batch numbers, track which batch stock was consumed from, expiry dates</div></div></div>
+    <div class="prow"><div class="pnum">15</div><div><div class="ptitle">Stock Aging Report</div><div class="pdesc">Products not sold in 30/60/90 days — helps identify slow-moving inventory</div></div></div>
+  </div>
+</div>
+
+<hr class="divider" />
+
+
+<h2>Summary</h2>
+<div class="grid">
+  <div class="card">
+    <div class="card-label" style="color:#059669">What works today</div>
+    <div style="font-size:12.5px;color:#374151;margin-top:6px;line-height:1.8">
+      ✅ Add / edit / delete products<br />
+      ✅ Search &amp; category filter<br />
+      ✅ Stock auto-deducts on sales<br />
+      ✅ Low stock badge &amp; count<br />
+      ✅ Multi-unit (meter/kg/piece…)<br />
+      ✅ GST, HSN, pricing fields
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-label" style="color:#dc2626">Biggest gaps right now</div>
+    <div style="font-size:12.5px;color:#374151;margin-top:6px;line-height:1.8">
+      ❌ Can't see stock movement history<br />
+      ❌ Can't manually adjust stock<br />
+      ❌ Can't add purchase/inward stock<br />
+      ❌ No pagination (stuck at 20 items)<br />
+      ❌ No low-stock filtered view<br />
+      ❌ No export / import
+    </div>
+  </div>
+</div>
+
+<footer>Made with IBM Bob</footer>
+</body>
+</html>
