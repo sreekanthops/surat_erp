@@ -510,19 +510,61 @@ function ConvertLeadModal({ card, onClose, onSuccess }: { card: LeadCard; onClos
 }
 
 // ── Main ChatbotPage ──────────────────────────────────────────────────────────
+const DEFAULT_GREETING: Message = {
+  role: 'assistant',
+  content: 'Namaste! Main aapka AI business assistant hoon. Aap mujhse apne business ke baare mein kuch bhi pooch sakte hain.\n\n💡 Charts ke liye poochein: "Top products ka bar chart", "Payment status pie chart", "Monthly sales trend"\n💡 WhatsApp leads ke liye: "WhatsApp pe kaun customer ban sakta hai?"',
+};
+
+const STORAGE_CHAT_KEY = 'textileiq_chat_messages_v1';
+const STORAGE_SESSION_KEY = 'textileiq_chat_session_id';
+
 export default function ChatbotPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Namaste! Main aapka AI business assistant hoon. Aap mujhse apne business ke baare mein kuch bhi pooch sakte hain.\n\n💡 Charts ke liye poochein: "Top products ka bar chart", "Payment status pie chart", "Monthly sales trend"\n💡 WhatsApp leads ke liye: "WhatsApp pe kaun customer ban sakta hai?"',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CHAT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore */ }
+    return [DEFAULT_GREETING];
+  });
+
   const [input, setInput]         = useState('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(STORAGE_SESSION_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
   const [convertCard, setConvertCard] = useState<LeadCard | null>(null);
   const [convertSuccess, setConvertSuccess] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
+
+  // Sync messages & sessionId to localStorage on update
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_CHAT_KEY, JSON.stringify(messages));
+    } catch { /* ignore */ }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      if (sessionId) localStorage.setItem(STORAGE_SESSION_KEY, sessionId);
+      else localStorage.removeItem(STORAGE_SESSION_KEY);
+    } catch { /* ignore */ }
+  }, [sessionId]);
+
+  const clearChat = () => {
+    setMessages([DEFAULT_GREETING]);
+    setSessionId(null);
+    try {
+      localStorage.removeItem(STORAGE_CHAT_KEY);
+      localStorage.removeItem(STORAGE_SESSION_KEY);
+    } catch { /* ignore */ }
+  };
 
   const mutation = useMutation({
     mutationFn: (message: string) =>
@@ -575,9 +617,18 @@ export default function ChatbotPage() {
             <h1 className="text-sm font-bold text-gray-900 leading-tight">AI Business Assistant</h1>
             <p className="text-xs text-gray-400 leading-tight">WhatsApp leads · Charts · Sales · Stock · Payments</p>
           </div>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-            <span className="text-xs text-gray-400">Online</span>
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={clearChat}
+              title="Clear chat history"
+              className="text-xs text-gray-400 hover:text-gray-700 px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              Clear Chat
+            </button>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+              <span className="text-xs text-gray-400">Online</span>
+            </div>
           </div>
         </div>
       </div>

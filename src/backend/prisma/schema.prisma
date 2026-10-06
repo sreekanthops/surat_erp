@@ -87,8 +87,8 @@ model User {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId     String    @db.Uuid
   tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  groupId      String    @db.Uuid
-  group        Group     @relation(fields: [groupId], references: [id])
+  groupId      String?   @db.Uuid
+  group        Group?    @relation(fields: [groupId], references: [id])
   name         String    @db.VarChar(255)
   username     String    @db.VarChar(100)
   phone        String?   @db.VarChar(15)
@@ -569,6 +569,7 @@ model IntegrationConfig {
   lastSyncAt   DateTime?
   syncStatus   String?         @db.VarChar(20)
 
+  @@unique([tenantId, type])
   @@index([tenantId, groupId, type])
   @@map("integration_configs")
 }

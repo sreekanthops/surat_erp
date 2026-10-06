@@ -10,10 +10,10 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const FREE_MODELS = process.env.OPENROUTER_MODEL
   ? [process.env.OPENROUTER_MODEL]
   : [
-      'google/gemma-4-31b-it:free',
-      'nvidia/nemotron-3-super-120b-a12b:free',
-      'qwen/qwen3.8-27b:free',
-      'nvidia/nemotron-3.5-lightning:free',
+      'google/gemini-2.0-flash-exp:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      'google/gemma-2-9b-it:free',
     ];
 
 const chatSchema = z.object({
@@ -24,14 +24,17 @@ const chatSchema = z.object({
 
 // ── Fetch live business data from DB ─────────────────────────────────────────
 async function fetchLiveContext(tenantId: string): Promise<string> {
-  const today     = new Date(); today.setHours(0, 0, 0, 0);
+  const today      = new Date(); today.setHours(0, 0, 0, 0);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const todayEnd  = new Date(today); todayEnd.setHours(23, 59, 59, 999);
+  const todayEnd   = new Date(today); todayEnd.setHours(23, 59, 59, 999);
+  const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
   const [
     todaySales,
     monthSales,
     monthPurchases,
+    last6MonthsSalesRaw,
+    topProductsRaw,
     pendingPayments,
     products,
     leads,
@@ -54,6 +57,35 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
       _sum: { totalAmount: true },
       _count: true,
     }),
+    // 6-month monthly sales & purchases aggregation
+    prisma.$queryRawUnsafe(`
+      SELECT
+        TO_CHAR(date, 'Mon YYYY') as month_label,
+        TO_CHAR(date, 'YYYY-MM') as month_sort,
+        SUM(CASE WHEN type = 'SALE' THEN "totalAmount" ELSE 0 END)::float as sales,
+        SUM(CASE WHEN type = 'PURCHASE' THEN "totalAmount" ELSE 0 END)::float as purchases,
+        COUNT(CASE WHEN type = 'SALE' THEN 1 END)::int as sales_count
+      FROM transactions
+      WHERE "tenantId" = '${tenantId}'::uuid
+        AND date >= $1
+      GROUP BY TO_CHAR(date, 'Mon YYYY'), TO_CHAR(date, 'YYYY-MM')
+      ORDER BY month_sort ASC
+    `, sixMonthsAgo) as Promise<any[]>,
+    // Top products by actual sales revenue (all-time / recent 6 months)
+    prisma.$queryRawUnsafe(`
+      SELECT
+        ti."productName" as name,
+        SUM(ti."totalAmount")::float as revenue,
+        SUM(ti.quantity)::float as qty,
+        COUNT(DISTINCT t.id)::int as order_count
+      FROM transaction_items ti
+      JOIN transactions t ON t.id = ti."transactionId"
+      WHERE t."tenantId" = '${tenantId}'::uuid
+        AND t.type = 'SALE'
+      GROUP BY ti."productName"
+      ORDER BY revenue DESC
+      LIMIT 10
+    `) as Promise<any[]>,
     prisma.transaction.findMany({
       where: { tenantId, type: 'SALE', status: { in: ['PENDING', 'PARTIAL'] } },
       include: { party: true },
@@ -109,6 +141,14 @@ async function fetchLiveContext(tenantId: string): Promise<string> {
   const monthlyPurchaseAmt = Number(monthPurchases._sum.totalAmount || 0);
   const monthlyProfit      = monthlySalesAmt - monthlyPurchaseAmt;
   const profitMargin       = monthlySalesAmt > 0 ? ((monthlyProfit / monthlySalesAmt) * 100).toFixed(1) : '0';
+
+  const monthlyTrendLines = (last6MonthsSalesRaw || []).map((m: any) =>
+    `  • ${m.month_label}: Sales = ${fmt(m.sales)} (${m.sales_count} invoices), Purchases = ${fmt(m.purchases)}, Profit = ${fmt(Number(m.sales || 0) - Number(m.purchases || 0))}`
+  ).join('\n');
+
+  const topProductLines = (topProductsRaw || []).map((p: any, i: number) =>
+    `  ${i + 1}. ${p.name}: Revenue = ${fmt(p.revenue)}, Total Qty Sold = ${p.qty}, Orders = ${p.order_count}`
+  ).join('\n');
 
   const productLines = products.map((p) =>
     `  • ${p.name} (${p.code}): stock=${Number(p.currentStock)} ${p.unit}, sell=₹${Number(p.saleRate)}, buy=₹${Number(p.purchaseRate)}${Number(p.currentStock) <= Number(p.reorderLevel) ? ' ⚠️ LOW STOCK' : ''}`
@@ -187,6 +227,12 @@ THIS MONTH'S PERFORMANCE:
   Sales: ${fmt(monthSales._sum.totalAmount)} across ${monthSales._count} invoices
   Purchases (cost): ${fmt(monthPurchases._sum.totalAmount)} across ${monthPurchases._count} orders
   Gross Profit: ${fmt(monthlyProfit)} (${profitMargin}% margin)
+
+LAST 6 MONTHS MONTHLY SALES & PURCHASES HISTORY:
+${monthlyTrendLines || '  No monthly history data'}
+
+TOP SELLING PRODUCTS (by actual sales revenue):
+${topProductLines || '  No product sales data'}
 
 CURRENT STOCK:
 ${productLines}

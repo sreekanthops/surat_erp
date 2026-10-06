@@ -271,8 +271,10 @@ adminRouter.post('/users', async (req, res, next) => {
     const tenantId = (req as any).user.tenantId;
     const body = createUserSchema.parse(req.body);
 
-    const existing = await prisma.user.findUnique({ where: { phone: body.phone } });
-    if (existing) return res.status(409).json({ error: 'Phone number already in use' });
+    if (body.phone) {
+      const existing = await prisma.user.findFirst({ where: { phone: body.phone, tenantId } });
+      if (existing) return res.status(409).json({ error: 'Phone number already in use' });
+    }
 
     const passwordHash = await bcrypt.hash(body.password, 10);
     const { password, ...rest } = body;
@@ -284,7 +286,17 @@ adminRouter.post('/users', async (req, res, next) => {
     }
 
     const user = await prisma.user.create({
-      data: { tenantId, passwordHash, ...rest },
+      data: {
+        tenantId,
+        passwordHash,
+        name: rest.name,
+        username: rest.phone.replace(/[^a-zA-Z0-9_]/g, '') || crypto.randomUUID().slice(0, 8),
+        phone: rest.phone,
+        email: rest.email ?? undefined,
+        role: rest.role,
+        isActive: rest.isActive,
+        groupId: rest.groupId ?? undefined,
+      },
       select: { id: true, name: true, phone: true, role: true, isActive: true, groupId: true },
     });
     return res.status(201).json(user);

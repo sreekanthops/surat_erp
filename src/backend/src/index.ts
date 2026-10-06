@@ -101,7 +101,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || '127.0.0.1';
 
 server.listen(PORT, HOST, async () => {
