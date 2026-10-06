@@ -6,16 +6,27 @@ import { z } from 'zod';
 export const aiRouter = Router();
 
 const OPENROUTER_API_KEY = () => process.env.OPENROUTER_API_KEY || '';
-// Fast & reliable models
-const FREE_MODELS = () => process.env.OPENROUTER_MODEL
-  ? [process.env.OPENROUTER_MODEL]
-  : [
-      'google/gemini-2.0-flash-exp:free',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'deepseek/deepseek-chat:free',
-      'qwen/qwen-2.5-72b-instruct:free',
-      'google/gemma-2-9b-it:free',
-    ];
+
+// If user explicitly configured OPENROUTER_MODEL in .env, try that first.
+// Otherwise, try standard/active models + currently working free tiers.
+const FREE_MODELS = () => {
+  const custom = process.env.OPENROUTER_MODEL;
+  const defaults = [
+    // Standard paid models (if account has credits)
+    'meta-llama/llama-3.3-70b-instruct',
+    'deepseek/deepseek-chat',
+    'google/gemini-2.0-flash-001',
+    'openai/gpt-4o-mini',
+    'qwen/qwen-2.5-72b-instruct',
+    // Active free-tier fallback slugs on OpenRouter
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'google/gemma-2-9b-it:free',
+    'mistralai/mistral-7b-instruct:free',
+    'qwen/qwen-2-7b-instruct:free',
+    'microsoft/phi-3-medium-128k-instruct:free',
+  ];
+  return custom ? [custom, ...defaults.filter(m => m !== custom)] : defaults;
+};
 
 const chatSchema = z.object({
   sessionId: z.string().uuid().nullish(),
