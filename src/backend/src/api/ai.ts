@@ -5,13 +5,14 @@ import { z } from 'zod';
 
 export const aiRouter = Router();
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-// Fallback chain — tried in order if the previous model returns 429/503
-const FREE_MODELS = process.env.OPENROUTER_MODEL
+const OPENROUTER_API_KEY = () => process.env.OPENROUTER_API_KEY || '';
+// Fast & reliable models
+const FREE_MODELS = () => process.env.OPENROUTER_MODEL
   ? [process.env.OPENROUTER_MODEL]
   : [
       'google/gemini-2.0-flash-exp:free',
       'meta-llama/llama-3.3-70b-instruct:free',
+      'deepseek/deepseek-chat:free',
       'qwen/qwen-2.5-72b-instruct:free',
       'google/gemma-2-9b-it:free',
     ];
@@ -327,33 +328,47 @@ aiRouter.post('/chat', async (req, res, next) => {
     ];
 
     let orRes: any;
+    const apiKey = OPENROUTER_API_KEY();
+    const models = FREE_MODELS();
+
+    if (!apiKey) {
+      return res.status(503).json({
+        error: 'OPENROUTER_API_KEY is not configured in backend .env. Please set OPENROUTER_API_KEY.',
+      });
+    }
+
     let lastErr: any;
-    for (const model of FREE_MODELS) {
+    for (const model of models) {
       try {
         orRes = await axios.post(
           'https://openrouter.ai/api/v1/chat/completions',
           { model, messages, temperature: 0.2, max_tokens: 1200 },
           {
             headers: {
-              Authorization:  `Bearer ${OPENROUTER_API_KEY}`,
+              Authorization:  `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
-              'HTTP-Referer':  'https://surat-textile-dashboard.app',
-              'X-Title':       'Surat Textile Dashboard',
+              'HTTP-Referer':  'https://textileiq.in',
+              'X-Title':       'GSpaces TextileIQ',
             },
-            timeout: 30000,
+            timeout: 25000,
           }
         );
         break; // success — stop trying
       } catch (err: any) {
         const status = err?.response?.status;
-        if (status === 429 || status === 503 || status === 404) {
-          lastErr = err;
+        const msg = err?.response?.data?.error?.message || err?.message;
+        lastErr = err;
+        console.warn(`[AI Chat] Model ${model} failed with status ${status}: ${msg}. Trying next model...`);
+        if (status === 400 || status === 404 || status === 429 || status === 503 || status === 502) {
           continue; // try next model
         }
-        throw err; // non-retryable error
+        break;
       }
     }
-    if (!orRes) throw lastErr;
+    if (!orRes) {
+      const errDetail = lastErr?.response?.data?.error?.message || lastErr?.message || 'AI service unavailable';
+      return res.status(503).json({ error: `AI request failed: ${errDetail}` });
+    }
 
     const rawResponse = orRes.data.choices[0].message.content || '';
     const tokensUsed  = orRes.data.usage?.total_tokens ?? null;
@@ -401,34 +416,36 @@ aiRouter.get('/suggestions', async (req, res, next) => {
   try {
     const tenantId   = (req as any).user.tenantId;
     const liveData   = await fetchLiveContext(tenantId);
+    const apiKey     = OPENROUTER_API_KEY();
+    const models     = FREE_MODELS();
+
+    if (!apiKey) {
+      return res.json({ suggestions: '[]' });
+    }
 
     const prompt = `Based on this real business data:\n${liveData}\n\nGenerate 3-5 specific, actionable morning suggestions in Hinglish for the owner. Include any hot WhatsApp leads that need follow-up. Use actual party names and amounts from the data. Return as JSON array of strings only.`;
 
     let orRes: any;
     let lastErr: any;
-    for (const model of FREE_MODELS) {
+    for (const model of models) {
       try {
         orRes = await axios.post(
           'https://openrouter.ai/api/v1/chat/completions',
           { model, messages: [{ role: 'user', content: prompt }], temperature: 0.4, max_tokens: 400 },
           {
             headers: {
-              Authorization:  `Bearer ${OPENROUTER_API_KEY}`,
+              Authorization:  `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
-              'HTTP-Referer':  'https://surat-textile-dashboard.app',
-              'X-Title':       'Surat Textile Dashboard',
+              'HTTP-Referer':  'https://textileiq.in',
+              'X-Title':       'GSpaces TextileIQ',
             },
-            timeout: 30000,
+            timeout: 25000,
           }
         );
         break;
       } catch (err: any) {
-        const status = err?.response?.status;
-        if (status === 429 || status === 503 || status === 404) {
-          lastErr = err;
-          continue;
-        }
-        throw err;
+        lastErr = err;
+        continue;
       }
     }
     if (!orRes) throw lastErr;
