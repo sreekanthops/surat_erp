@@ -881,9 +881,9 @@ export default function ChatbotPage() {
       const detail = err?.response?.data?.error || err?.response?.data?.detail || err?.message;
       const msg = status === 401
         ? 'Session expire ho gayi. Please refresh karein aur dobara login karein.'
-        : status === 503 || !status
+        : detail || (status === 503 || !status
         ? 'AI service abhi available nahi hai. Backend check karein.'
-        : `Error: ${detail || 'Kuch gadbad ho gayi, dobara try karein.'}`;
+        : 'Kuch gadbad ho gayi, dobara try karein.');
       setMessages((prev) => [...prev, { role: 'assistant', content: msg }]);
     },
   });
