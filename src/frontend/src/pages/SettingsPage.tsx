@@ -437,32 +437,158 @@ function GmailSection({ gmailStatus, onRefresh }: {
 
 function ProfileSection() {
   const user = useAuthStore(s => s.user);
+  const setAuth = useAuthStore(s => s.setAuth);
+  const token = useAuthStore(s => s.token);
+  const refreshToken = useAuthStore(s => s.refreshToken);
+
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState((user as any)?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Load current user profile from server
+  useEffect(() => {
+    api.get('/api/v1/auth/me')
+      .then(res => {
+        if (res.data) {
+          setName(res.data.name || '');
+          setEmail(res.data.email || '');
+          setPhone(res.data.phone || '');
+          if (user && token && refreshToken) {
+            setAuth(token, refreshToken, { ...user, email: res.data.email, phone: res.data.phone });
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !email.includes('@')) {
+      setMsg({ type: 'error', text: 'Please enter a valid recovery email address.' });
+      return;
+    }
+    setSaving(true);
+    setMsg(null);
+    try {
+      const res = await api.put('/api/v1/auth/profile', {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+      });
+
+      if (user && token && refreshToken) {
+        setAuth(token, refreshToken, { ...user, name: res.data.user.name, email: res.data.user.email, phone: res.data.user.phone });
+      }
+      setMsg({ type: 'success', text: 'Profile updated! Your recovery email is saved for password reset.' });
+    } catch (err: any) {
+      setMsg({ type: 'error', text: err.response?.data?.error || 'Failed to update profile.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div style={S.card}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <User size={18} color="#7c3aed" />
+    <div>
+      {/* Account Info Card */}
+      <div style={S.card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <User size={18} color="#7c3aed" />
+          </div>
+          <div>
+            <div style={S.sectionTitle}>Account Overview</div>
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>Your login identifier and team access</div>
+          </div>
         </div>
-        <div>
-          <div style={S.sectionTitle}>Your Account</div>
-          <div style={{ fontSize: '12px', color: '#9ca3af' }}>Login and role information</div>
+        <div style={S.divider} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          {[
+            { label: 'Login Handle', value: `${user?.group?.name || 'group'}/${user?.username || 'user'}` },
+            { label: 'Role', value: user?.role },
+            { label: 'Team Workspace', value: user?.tenant?.name },
+            { label: 'Group', value: user?.group?.name || '—' },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</div>
+              <div style={{ fontSize: '13.5px', color: '#111827', fontWeight: 600 }}>{value}</div>
+            </div>
+          ))}
         </div>
       </div>
-      <div style={S.divider} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-        {[
-          { label: 'Name', value: user?.name },
-          { label: 'Phone', value: user?.phone },
-          { label: 'Role', value: user?.role },
-          { label: 'Team', value: user?.tenant?.name },
-          { label: 'Plan', value: user?.tenant?.plan },
-          { label: 'Group', value: user?.group?.name || '—' },
-        ].map(({ label, value }) => (
-          <div key={label}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</div>
-            <div style={{ fontSize: '13.5px', color: '#111827', fontWeight: 500 }}>{value}</div>
+
+      {/* Profile & Recovery Email Configuration */}
+      <div style={S.card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Mail size={18} color="#0284c7" />
           </div>
-        ))}
+          <div>
+            <div style={S.sectionTitle}>Personal Email & Phone Configuration</div>
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+              Used to send temporary passwords if you ever forget your password
+            </div>
+          </div>
+        </div>
+        <div style={S.divider} />
+
+        {msg && <Alert type={msg.type} message={msg.text} />}
+
+        <form onSubmit={handleSave}>
+          <div style={S.inputGroup}>
+            <label style={S.label}>Your Name</label>
+            <input
+              style={S.input}
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Full Name"
+              required
+            />
+          </div>
+
+          <div style={S.row}>
+            <div style={S.inputGroup}>
+              <label style={S.label}>
+                Recovery Email Address <span style={{ color: '#dc2626' }}>* (Required for Forgot Password)</span>
+              </label>
+              <input
+                style={S.input}
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="your.email@example.com"
+                required
+              />
+              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                If you forget your password, the reset code / temporary password will be sent here.
+              </span>
+            </div>
+
+            <div style={S.inputGroup}>
+              <label style={S.label}>Phone Number</label>
+              <input
+                style={S.input}
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="9876543210"
+              />
+            </div>
+          </div>
+
+          <div style={S.btnRow}>
+            <button
+              type="submit"
+              disabled={saving}
+              style={S.btnPrimary}
+            >
+              <Save size={14} />
+              {saving ? 'Saving...' : 'Save Profile & Email'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -512,17 +638,16 @@ function TeamSection({ callerRole }: { callerRole: string }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editUser, setEditUser] = useState<TeamUser | null>(null);
-  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', role: 'STAFF', groupId: '' });
+  const [form, setForm] = useState({ name: '', username: '', email: '', phone: '', password: '', role: 'STAFF', groupId: '' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [usersRes, groupsRes] = await Promise.all([
-        api.get('/api/v1/users'),
-        api.get('/api/v1/admin/groups'),
-      ]);
+      // First try directory endpoint (works for all roles), fallback to admin users endpoint
+      const usersRes = await api.get('/api/v1/users/team-directory').catch(() => api.get('/api/v1/users'));
+      const groupsRes = await api.get('/api/v1/admin/groups').catch(() => ({ data: { data: [] } }));
       setUsers(usersRes.data.data);
       setGroups(groupsRes.data.data ?? []);
     } catch { /* ignore */ } finally { setLoading(false); }
@@ -534,12 +659,12 @@ function TeamSection({ callerRole }: { callerRole: string }) {
 
   const openAdd = () => {
     setEditUser(null);
-    setForm({ name: '', username: '', email: '', password: '', role: 'STAFF', groupId: defaultGroupId });
+    setForm({ name: '', username: '', email: '', phone: '', password: '', role: 'STAFF', groupId: defaultGroupId });
     setShowAdd(true);
   };
   const openEdit = (u: TeamUser) => {
     setEditUser(u);
-    setForm({ name: u.name, username: u.username ?? '', email: u.email ?? '', password: '', role: u.role, groupId: u.group?.id ?? defaultGroupId });
+    setForm({ name: u.name, username: u.username ?? '', email: u.email ?? '', phone: u.phone ?? '', password: '', role: u.role, groupId: u.group?.id ?? defaultGroupId });
     setShowAdd(true);
   };
 
@@ -599,7 +724,7 @@ function TeamSection({ callerRole }: { callerRole: string }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#f7f8fa' }}>
-                {['Name', 'Login', 'Group', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
+                {['Name & Contact', 'Login Handle', 'Role', 'Status', 'Last Login', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '1px solid #e5e7eb', fontSize: '12px' }}>{h}</th>
                 ))}
               </tr>
@@ -608,22 +733,31 @@ function TeamSection({ callerRole }: { callerRole: string }) {
               {users.map(u => {
                 const rc = ROLE_COLORS[u.role] ?? ROLE_COLORS.STAFF;
                 const isOwner = u.role === 'OWNER';
+                const isMe = u.id === currentUser?.id;
                 return (
-                  <tr key={u.id} style={{ borderBottom: '1px solid #f0f1f5' }}>
+                  <tr key={u.id} style={{ borderBottom: '1px solid #f0f1f5', background: isMe ? '#f8faff' : '#fff' }}>
                     <td style={{ padding: '10px 14px' }}>
-                      <div style={{ fontWeight: 600, color: '#1f2328' }}>{u.name}</div>
-                      {u.email && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{u.email}</div>}
+                      <div style={{ fontWeight: 700, color: '#1f2328', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {u.name}
+                        {isMe && <span style={{ fontSize: 10, background: '#dbeafe', color: '#1e40af', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>YOU</span>}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 3 }}>
+                        {u.email && <div style={{ fontSize: '11.5px', color: '#4b5563' }}>📧 {u.email}</div>}
+                        {u.phone && <div style={{ fontSize: '11.5px', color: '#4b5563' }}>📞 {u.phone}</div>}
+                        {!u.email && <div style={{ fontSize: '11px', color: '#dc2626' }}>⚠️ No recovery email configured</div>}
+                      </div>
                     </td>
                     <td style={{ padding: '10px 14px' }}>
-                      {u.group && (
+                      {u.group ? (
                         <span style={{ fontSize: '12px', color: '#6b7280' }}>
                           <span style={{ color: '#5b21b6', fontWeight: 600 }}>{u.group.name}</span>
                           <span style={{ color: '#d1d5db' }}>/</span>
                           <span style={{ fontWeight: 600, color: '#166534' }}>{u.username}</span>
                         </span>
+                      ) : (
+                        <span style={{ fontWeight: 600, color: '#166534', fontSize: '12px' }}>{u.username}</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 14px', fontSize: '12px', color: '#6b7280' }}>{u.group?.name ?? '—'}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ ...rc, display: 'inline-block', borderRadius: '5px', padding: '2px 8px', fontSize: '11.5px', fontWeight: 700 }}>
                         {ROLE_LABELS[u.role] ?? u.role}
@@ -636,16 +770,14 @@ function TeamSection({ callerRole }: { callerRole: string }) {
                       </span>
                     </td>
                     <td style={{ padding: '10px 14px', color: '#6b7280', fontSize: '12px' }}>
-                      {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : '—'}
+                      {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('en-IN') : '—'}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
-                      {!isOwner && (
+                      {canWriteUsers && !isOwner ? (
                         <div style={{ display: 'flex', gap: '4px' }}>
-                          {canWriteUsers && (
-                            <button style={iBtn('#ede9fe', '#5b21b6')} onClick={() => openEdit(u)} title="Edit">
-                              <Pencil size={12} />
-                            </button>
-                          )}
+                          <button style={iBtn('#ede9fe', '#5b21b6')} onClick={() => openEdit(u)} title="Edit">
+                            <Pencil size={12} />
+                          </button>
                           {canDeleteUsers && (
                             <button
                               style={iBtn(u.isActive ? '#fef2f2' : '#f0fdf4', u.isActive ? '#ef4444' : '#16a34a')}
@@ -656,6 +788,8 @@ function TeamSection({ callerRole }: { callerRole: string }) {
                             </button>
                           )}
                         </div>
+                      ) : (
+                        <span style={{ color: '#9ca3af', fontSize: 11 }}>—</span>
                       )}
                     </td>
                   </tr>
@@ -788,11 +922,11 @@ export default function SettingsPage() {
 
       <div style={S.tabs}>
         {canConfigureIntegrations && <Tab label="Integrations" active={tab === 'integrations'} onClick={() => setTab('integrations')} />}
-        {canViewUsers && <Tab label="Team" active={tab === 'team'} onClick={() => setTab('team')} />}
-        <Tab label="Profile" active={tab === 'profile'} onClick={() => setTab('profile')} />
+        <Tab label="Team Directory" active={tab === 'team'} onClick={() => setTab('team')} />
+        <Tab label="Profile & Security" active={tab === 'profile'} onClick={() => setTab('profile')} />
       </div>
 
-      <div style={{ maxWidth: '720px' }}>
+      <div style={{ maxWidth: '780px' }}>
         {tab === 'integrations' && (
           canConfigureIntegrations ? (
             loading ? (
@@ -810,7 +944,7 @@ export default function SettingsPage() {
         )}
 
         {tab === 'team' && (
-          canViewUsers ? <TeamSection callerRole={user?.role ?? ''} /> : <AccessDenied />
+          <TeamSection callerRole={user?.role ?? ''} />
         )}
 
         {tab === 'profile' && <ProfileSection />}

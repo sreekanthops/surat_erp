@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
-import { Send, Bot, User, Download, BarChart2 } from 'lucide-react';
+import {
+  Send, Bot, User, Download, BarChart2, Building2, Phone,
+  CreditCard, ArrowRight, ExternalLink, RefreshCw, X, ShoppingCart, MessageSquare, Package
+} from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   AreaChart, Area, ComposedChart,
@@ -50,36 +54,85 @@ const fmtK = (n: number) =>
   : n >= 1_00_000 ? `₹${(n/1_00_000).toFixed(1)}L`
   : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
 
+// ── Known Customer Names list for instant click detection ──────────────────
+const KNOWN_PARTIES = [
+  'Sharma Traders', 'Modi Fabrics', 'Patel Yarn Mills', 'Jain Saree House',
+  'Gupta Wholesale', 'Rajesh Textiles', 'Mehta Cloth Stores', 'Silk India Suppliers'
+];
+
 // ── Markdown renderer ─────────────────────────────────────────────────────────
-// Renders AI response text with styled bold, bullets, stat highlights, headers
-function renderMarkdown(text: string): React.ReactNode {
-  // Split into lines, process each
+// Renders AI response text with styled bold, bullets, stat highlights, clickable customer badges
+function renderMarkdown(text: string, onCustomerClick?: (name: string) => void): React.ReactNode {
   const lines = text.split('\n');
   const nodes: React.ReactNode[] = [];
   let keyIdx = 0;
 
   const renderInline = (line: string): React.ReactNode[] => {
-    // Parse **bold** segments + ₹number highlights inline
     const parts: React.ReactNode[] = [];
-    // Combined regex: **bold** or ₹number patterns
-    const re = /\*\*(.+?)\*\*|(₹[\d,\.]+(?:\s*(?:Cr|L|K))?)/g;
+    // Match [Customer Name], **bold**, or ₹currency patterns
+    const re = /\[([A-Za-z0-9\s—\-&]+)\]|\*\*(.+?)\*\*|(₹[\d,\.]+(?:\s*(?:Cr|L|K))?)/g;
     let last = 0;
     let m: RegExpExecArray | null;
+
     while ((m = re.exec(line)) !== null) {
-      if (m.index > last) parts.push(line.slice(last, m.index));
+      if (m.index > last) {
+        // Check if raw text contains any known party name
+        const rawSlice = line.slice(last, m.index);
+        parts.push(parseKnownParties(rawSlice, onCustomerClick, `raw-${m.index}`));
+      }
+
       if (m[1] !== undefined) {
-        // **bold** — could be a section header (ends with :) or just bold
-        const isHeader = m[1].trim().endsWith(':');
+        // [Customer Name] in brackets
+        const custName = m[1].trim();
         parts.push(
-          <strong key={`b${m.index}`} style={{
-            fontWeight: 700,
-            color: isHeader ? '#5b5bd6' : '#111827',
-            letterSpacing: isHeader ? '0.01em' : undefined,
-          }}>
-            {m[1]}
-          </strong>
+          <button
+            key={`cust-${m.index}`}
+            onClick={() => onCustomerClick?.(custName)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              background: '#ede9fe', color: '#5b21b6', fontWeight: 700, fontSize: '0.9em',
+              padding: '1px 8px', borderRadius: 6, border: '1px solid #ddd6fe',
+              margin: '0 2px', cursor: 'pointer', transition: 'all 0.15s',
+            }}
+            title="Click to view full customer details & ledger"
+          >
+            🏢 {custName} <span style={{ fontSize: 10, color: '#7c3aed' }}>↗</span>
+          </button>
         );
       } else if (m[2] !== undefined) {
+        // **bold**
+        const content = m[2].trim();
+        const isKnownParty = KNOWN_PARTIES.some(p => content.toLowerCase().includes(p.toLowerCase()));
+        const isHeader = content.endsWith(':');
+
+        if (isKnownParty && onCustomerClick) {
+          parts.push(
+            <button
+              key={`b-cust-${m.index}`}
+              onClick={() => onCustomerClick(content)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: '#ede9fe', color: '#5b21b6', fontWeight: 700, fontSize: '0.9em',
+                padding: '1px 8px', borderRadius: 6, border: '1px solid #ddd6fe',
+                margin: '0 2px', cursor: 'pointer',
+              }}
+              title="Click to view customer details"
+            >
+              🏢 {content}
+            </button>
+          );
+        } else {
+          parts.push(
+            <strong key={`b${m.index}`} style={{
+              fontWeight: 700,
+              color: isHeader ? '#5b5bd6' : '#111827',
+              letterSpacing: isHeader ? '0.01em' : undefined,
+            }}>
+              {m[2]}
+            </strong>
+          );
+        }
+      } else if (m[3] !== undefined) {
         // ₹ currency number — highlighted pill
         parts.push(
           <span key={`r${m.index}`} style={{
@@ -90,15 +143,47 @@ function renderMarkdown(text: string): React.ReactNode {
             border: '1px solid #bfdbfe', margin: '0 1px',
             letterSpacing: '0.01em',
           }}>
-            {m[2]}
+            {m[3]}
           </span>
         );
       }
       last = m.index + m[0].length;
     }
-    if (last < line.length) parts.push(line.slice(last));
+    if (last < line.length) {
+      parts.push(parseKnownParties(line.slice(last), onCustomerClick, `end-${last}`));
+    }
     return parts;
   };
+
+  function parseKnownParties(str: string, onClick?: (n: string) => void, prefix = '') {
+    if (!onClick) return str;
+    for (const party of KNOWN_PARTIES) {
+      const idx = str.indexOf(party);
+      if (idx !== -1) {
+        const before = str.slice(0, idx);
+        const after = str.slice(idx + party.length);
+        return (
+          <span key={prefix}>
+            {before}
+            <button
+              onClick={() => onClick(party)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                background: '#ede9fe', color: '#5b21b6', fontWeight: 700, fontSize: '0.9em',
+                padding: '1px 7px', borderRadius: 6, border: '1px solid #ddd6fe',
+                margin: '0 2px', cursor: 'pointer',
+              }}
+              title="Click for full customer details"
+            >
+              🏢 {party}
+            </button>
+            {parseKnownParties(after, onClick, `${prefix}-after`)}
+          </span>
+        );
+      }
+    }
+    return str;
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
@@ -509,6 +594,215 @@ function ConvertLeadModal({ card, onClose, onSuccess }: { card: LeadCard; onClos
   );
 }
 
+// ── Customer Details Modal ────────────────────────────────────────────────────
+interface CustomerDetailsModalProps {
+  customerName: string;
+  onClose: () => void;
+  onNavigateSales: (partyId: string) => void;
+}
+
+function CustomerDetailsModal({ customerName, onClose, onNavigateSales }: CustomerDetailsModalProps) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let unmounted = false;
+    setLoading(true);
+    setError('');
+
+    api.get(`/api/v1/parties/find-by-name?name=${encodeURIComponent(customerName)}`)
+      .then(res => {
+        if (!unmounted) setData(res.data);
+      })
+      .catch(err => {
+        if (!unmounted) setError(err.response?.data?.error || 'Could not load customer information.');
+      })
+      .finally(() => {
+        if (!unmounted) setLoading(false);
+      });
+
+    return () => { unmounted = true; };
+  }, [customerName]);
+
+  const p = data?.party;
+  const m = data?.metrics;
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)',
+        backdropFilter: 'blur(4px)', zIndex: 2500, display: 'flex',
+        alignItems: 'center', justifyContent: 'center', padding: 16,
+      }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{
+        background: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 540,
+        boxShadow: '0 25px 70px rgba(0,0,0,0.25)', overflow: 'hidden', border: '1px solid #e2e8f0',
+      }}>
+        {/* Modal Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+          padding: '20px 24px', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+            }}>
+              🏢
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
+                {customerName}
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(224,231,255,0.8)' }}>
+                {p ? `${p.type} · ${p.city || 'Surat'}, ${p.state || 'Gujarat'}` : 'Customer 360° Profile'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff',
+              width: 32, height: 32, borderRadius: 10, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Modal Content */}
+        <div style={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}>
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '36px 0', color: '#64748b' }}>
+              <div style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</div>
+              <p style={{ marginTop: 8, fontSize: 13, fontWeight: 500 }}>Fetching live customer records…</p>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ padding: '16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, color: '#dc2626', fontSize: 13 }}>
+              {error}
+            </div>
+          )}
+
+          {p && (
+            <>
+              {/* Financial Metrics Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Total Sales</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{fmtK(m?.totalSales || 0)}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{m?.totalOrders || 0} Invoices</div>
+                </div>
+                <div style={{ background: '#f0fdf4', padding: '12px 14px', borderRadius: 12, border: '1px solid #bbf7d0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase', marginBottom: 4 }}>Paid Amount</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#15803d' }}>{fmtK(m?.totalPaid || 0)}</div>
+                  <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>Collected</div>
+                </div>
+                <div style={{ background: Number(p.currentBalance) > 0 ? '#fef2f2' : '#f8fafc', padding: '12px 14px', borderRadius: 12, border: Number(p.currentBalance) > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: Number(p.currentBalance) > 0 ? '#991b1b' : '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Balance Due</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: Number(p.currentBalance) > 0 ? '#dc2626' : '#0f172a' }}>{fmtK(Math.abs(Number(p.currentBalance || 0)))}</div>
+                  <div style={{ fontSize: 11, color: Number(p.currentBalance) > 0 ? '#ef4444' : '#64748b', marginTop: 2 }}>{Number(p.currentBalance) > 0 ? '⚠️ Outstanding' : 'Settled'}</div>
+                </div>
+              </div>
+
+              {/* Contact & Credit Info */}
+              <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', padding: '14px 16px', marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                  <div>
+                    <span style={{ fontSize: 11, color: '#64748b', display: 'block', fontWeight: 600 }}>Phone / WhatsApp</span>
+                    <strong style={{ color: '#0f172a' }}>{p.phone || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, color: '#64748b', display: 'block', fontWeight: 600 }}>GSTIN</span>
+                    <strong style={{ color: '#0f172a' }}>{p.gstin || 'Unregistered'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, color: '#64748b', display: 'block', fontWeight: 600 }}>Credit Limit</span>
+                    <strong style={{ color: '#0f172a' }}>{fmtK(Number(p.creditLimit || 0))}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, color: '#64748b', display: 'block', fontWeight: 600 }}>Location</span>
+                    <strong style={{ color: '#0f172a' }}>{p.city ? `${p.city}, ${p.state}` : 'Surat, Gujarat'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Invoices */}
+              {p.transactions && p.transactions.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+                    Recent Invoices & Transactions ({p.transactions.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {p.transactions.map((tx: any) => (
+                      <div key={tx.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12.5 }}>
+                        <div>
+                          <strong style={{ color: '#1e293b' }}>{tx.referenceNo}</strong>
+                          <span style={{ color: '#64748b', marginLeft: 8 }}>{new Date(tx.date).toLocaleDateString('en-IN')}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 700, color: '#0f172a' }}>₹{Number(tx.totalAmount).toLocaleString('en-IN')}</span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                            background: tx.status === 'PAID' ? '#dcfce7' : tx.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                            color: tx.status === 'PAID' ? '#15803d' : tx.status === 'PARTIAL' ? '#b45309' : '#b91c1c',
+                          }}>
+                            {tx.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Modal Footer with Action Buttons */}
+        <div style={{
+          padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px', borderRadius: 10, border: '1px solid #cbd5e1',
+              background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Close
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => {
+                onClose();
+                onNavigateSales(p?.id || '');
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 18px', borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(79,70,229,0.3)',
+              }}
+            >
+              <ShoppingCart size={15} />
+              Open Sales Tab
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ChatbotPage ──────────────────────────────────────────────────────────
 const DEFAULT_GREETING: Message = {
   role: 'assistant',
@@ -519,6 +813,8 @@ const STORAGE_CHAT_KEY = 'textileiq_chat_messages_v1';
 const STORAGE_SESSION_KEY = 'textileiq_chat_session_id';
 
 export default function ChatbotPage() {
+  const navigate = useNavigate();
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_CHAT_KEY);
@@ -666,7 +962,70 @@ export default function ChatbotPage() {
                   boxShadow: '0 1px 8px rgba(15,23,42,0.06)',
                   minWidth: 180,
                 }}>
-                  {renderMarkdown(msg.content)}
+                  {renderMarkdown(msg.content, (name) => setSelectedCustomer(name))}
+
+                  {/* Contextual Quick Navigation Buttons at end of assistant answer */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>
+                    <button
+                      onClick={() => navigate('/sales')}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', borderRadius: 8, background: '#f8fafc',
+                        border: '1px solid #cbd5e1', color: '#334155', fontSize: 11.5,
+                        fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#f8fafc')}
+                    >
+                      <ShoppingCart size={12} color="#4f46e5" />
+                      Go to Sales Tab ↗
+                    </button>
+
+                    <button
+                      onClick={() => navigate('/parties')}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', borderRadius: 8, background: '#f8fafc',
+                        border: '1px solid #cbd5e1', color: '#334155', fontSize: 11.5,
+                        fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#f8fafc')}
+                    >
+                      <Building2 size={12} color="#0891b2" />
+                      Parties & Customers ↗
+                    </button>
+
+                    <button
+                      onClick={() => navigate('/inventory')}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', borderRadius: 8, background: '#f8fafc',
+                        border: '1px solid #cbd5e1', color: '#334155', fontSize: 11.5,
+                        fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#f8fafc')}
+                    >
+                      <Package size={12} color="#d97706" />
+                      Inventory & Stock ↗
+                    </button>
+
+                    <button
+                      onClick={() => navigate('/inbox')}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', borderRadius: 8, background: '#f8fafc',
+                        border: '1px solid #cbd5e1', color: '#334155', fontSize: 11.5,
+                        fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#f8fafc')}
+                    >
+                      <MessageSquare size={12} color="#16a34a" />
+                      WhatsApp Inbox ↗
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -756,6 +1115,15 @@ export default function ChatbotPage() {
           card={convertCard}
           onClose={() => setConvertCard(null)}
           onSuccess={() => setConvertSuccess(`Lead created for ${convertCard.name}!`)}
+        />
+      )}
+
+      {/* Customer 360 Drilldown Modal */}
+      {selectedCustomer && (
+        <CustomerDetailsModal
+          customerName={selectedCustomer}
+          onClose={() => setSelectedCustomer(null)}
+          onNavigateSales={(partyId) => navigate('/sales')}
         />
       )}
     </div>

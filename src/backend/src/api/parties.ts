@@ -36,6 +36,69 @@ partiesRouter.get('/', async (req, res, next) => {
   }
 });
 
+// GET /api/v1/parties/find-by-name
+partiesRouter.get('/find-by-name', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const gf = groupFilter(req);
+    const name = (req.query.name as string || '').trim();
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    // Look for exact or partial name match
+    const party = await prisma.party.findFirst({
+      where: {
+        tenantId,
+        ...gf,
+        name: { contains: name, mode: 'insensitive' },
+      },
+      include: {
+        transactions: {
+          where: { tenantId },
+          orderBy: { date: 'desc' },
+          take: 5,
+          include: { items: true },
+        },
+        leads: {
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+        },
+      },
+    });
+
+    if (!party) return res.status(404).json({ error: 'Party not found' });
+
+    // Compute aggregates
+    const [salesAgg, pendingAgg] = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { tenantId, partyId: party.id, type: 'SALE' },
+        _sum: { totalAmount: true, paidAmount: true },
+        _count: true,
+      }),
+      prisma.transaction.aggregate({
+        where: { tenantId, partyId: party.id, type: 'SALE', status: { in: ['PENDING', 'PARTIAL'] } },
+        _sum: { totalAmount: true, paidAmount: true },
+      }),
+    ]);
+
+    const totalSales = Number(salesAgg._sum.totalAmount || 0);
+    const totalPaid = Number(salesAgg._sum.paidAmount || 0);
+    const pendingDue = Number(pendingAgg._sum.totalAmount || 0) - Number(pendingAgg._sum.paidAmount || 0);
+
+    return res.json({
+      party,
+      metrics: {
+        totalOrders: salesAgg._count,
+        totalSales,
+        totalPaid,
+        pendingDue: pendingDue > 0 ? pendingDue : Math.max(0, Number(party.currentBalance || 0)),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/v1/parties/:id/ledger
 partiesRouter.get('/:id/ledger', async (req, res, next) => {
   try {

@@ -11,6 +11,7 @@ interface User {
   name: string;
   username: string;
   phone?: string | null;
+  email?: string | null;
   role: string;
   tenant: { id: string; name: string; plan: string };
   group: Group;

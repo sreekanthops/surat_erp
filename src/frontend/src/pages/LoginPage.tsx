@@ -2,14 +2,19 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/hooks/useApi';
-import { Eye, EyeOff, AlertCircle, BarChart3, MessageSquare, Package } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, CheckCircle, BarChart3, MessageSquare, Package, KeyRound, Mail, ArrowLeft } from 'lucide-react';
 
 export default function LoginPage() {
-  const [login, setLogin]     = useState('');
-  const [password, setPassword] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError]     = useState('');
-  const [loading, setLoading] = useState(false);
+  const [login, setLogin]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [showPass, setShowPass]   = useState(false);
+  const [error, setError]         = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotLogin, setForgotLogin] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const { setAuth }  = useAuthStore();
   const navigate     = useNavigate();
 
@@ -184,10 +189,23 @@ export default function LoginPage() {
             </div>
 
             {/* Password */}
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                Password
-              </label>
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotLogin(login);
+                    setForgotMsg(null);
+                    setShowForgot(true);
+                  }}
+                  style={{ background: 'none', border: 'none', fontSize: '12px', color: '#5b5bd6', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPass ? 'text' : 'password'}
@@ -253,6 +271,107 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgot && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)',
+          backdropFilter: 'blur(4px)', zIndex: 3000, display: 'flex',
+          alignItems: 'center', justifyContent: 'center', padding: '20px',
+        }}
+        onClick={e => e.target === e.currentTarget && setShowForgot(false)}
+        >
+          <div style={{
+            background: '#ffffff', borderRadius: '18px', width: '100%', maxWidth: '420px',
+            padding: '28px', boxShadow: '0 25px 70px rgba(0,0,0,0.3)', border: '1px solid #e2e8f0',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6d28d9' }}>
+                <KeyRound size={20} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>Forgot Password</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Send temporary password to configured email</p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, margin: '14px 0 16px' }}>
+              Enter your login identifier (<strong>groupname/username</strong>). A temporary password will be sent to the email address registered in your profile.
+            </p>
+
+            {forgotMsg && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                padding: '10px 14px', borderRadius: '10px', fontSize: '12.5px', marginBottom: '14px',
+                background: forgotMsg.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                color: forgotMsg.type === 'success' ? '#065f46' : '#991b1b',
+                border: `1px solid ${forgotMsg.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
+              }}>
+                {forgotMsg.type === 'success' ? <CheckCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} /> : <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />}
+                <span>{forgotMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!forgotLogin.includes('/')) {
+                setForgotMsg({ type: 'error', text: 'Enter login format as groupname/username (e.g. textileiq/owner)' });
+                return;
+              }
+              setForgotLoading(true);
+              setForgotMsg(null);
+              try {
+                const res = await api.post('/api/v1/auth/forgot-password', { login: forgotLogin.trim() });
+                setForgotMsg({ type: 'success', text: res.data.message });
+              } catch (err: any) {
+                setForgotMsg({ type: 'error', text: err.response?.data?.error || 'Failed to request password reset.' });
+              } finally {
+                setForgotLoading(false);
+              }
+            }}>
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  Login Identifier
+                </label>
+                <input
+                  type="text"
+                  value={forgotLogin}
+                  onChange={e => setForgotLogin(e.target.value)}
+                  placeholder="groupname/username"
+                  required
+                  style={inputStyle}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowForgot(false)}
+                  style={{
+                    padding: '9px 16px', borderRadius: '10px', border: '1px solid #cbd5e1',
+                    background: '#fff', color: '#475569', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={{
+                    padding: '9px 18px', borderRadius: '10px', border: 'none',
+                    background: forgotLoading ? '#a5b4fc' : '#5b5bd6', color: '#fff',
+                    fontSize: '13px', fontWeight: 700, cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {forgotLoading ? 'Sending...' : 'Send Temporary Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

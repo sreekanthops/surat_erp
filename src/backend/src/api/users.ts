@@ -6,6 +6,40 @@ import { requirePermission } from '../middleware/permissions.js';
 
 export const usersRouter = Router();
 
+// GET /api/v1/users/team-directory — Accessible to ALL authenticated users in the group
+usersRouter.get('/team-directory', async (req, res, next) => {
+  try {
+    const tenantId = (req as any).user.tenantId;
+    const groupId  = (req as any).user.groupId;
+    const callerId = (req as any).user.userId;
+
+    const users = await prisma.user.findMany({
+      where: {
+        tenantId,
+        ...(groupId ? { groupId } : {}),
+        isActive: true,
+      },
+      select: {
+        id: true, name: true, username: true, phone: true, email: true,
+        role: true, lastLoginAt: true, createdAt: true,
+        group: { select: { id: true, name: true } },
+      },
+      orderBy: [
+        { role: 'asc' },
+        { name: 'asc' },
+      ],
+    });
+
+    return res.json({
+      data: users,
+      currentUserId: callerId,
+      total: users.length,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/v1/users  — list all users in this tenant (MANAGER+)
 usersRouter.get('/', requirePermission('users:view'), async (req, res, next) => {
   try {
