@@ -279,25 +279,38 @@ adminRouter.post('/users', async (req, res, next) => {
     const passwordHash = await bcrypt.hash(body.password, 10);
     const { password, ...rest } = body;
 
-    // Validate groupId belongs to same tenant
-    if (rest.groupId) {
-      const group = await prisma.group.findFirst({ where: { id: rest.groupId, tenantId } });
+    // Default to the first active group in tenant if not provided
+    let targetGroupId = rest.groupId;
+    if (targetGroupId) {
+      const group = await prisma.group.findFirst({ where: { id: targetGroupId, tenantId } });
       if (!group) return res.status(400).json({ error: 'Group not found in this tenant' });
+    } else {
+      const defaultGroup = await prisma.group.findFirst({ where: { tenantId, isActive: true } });
+      targetGroupId = defaultGroup?.id ?? null;
     }
+
+    // Clean username: prioritize name slug if available, else phone
+    const candidateUsername = rest.name.toLowerCase().replace(/[^a-z0-9_.-]/g, '') || rest.phone.replace(/[^a-zA-Z0-9_]/g, '');
+
+    // Check if candidate username already exists in this group
+    const dup = await prisma.user.findFirst({
+      where: { groupId: targetGroupId ?? undefined, username: candidateUsername },
+    });
+    const finalUsername = dup ? rest.phone.replace(/[^a-zA-Z0-9_]/g, '') || crypto.randomUUID().slice(0, 8) : candidateUsername;
 
     const user = await prisma.user.create({
       data: {
         tenantId,
         passwordHash,
         name: rest.name,
-        username: rest.phone.replace(/[^a-zA-Z0-9_]/g, '') || crypto.randomUUID().slice(0, 8),
+        username: finalUsername,
         phone: rest.phone,
         email: rest.email ?? undefined,
         role: rest.role,
         isActive: rest.isActive,
-        groupId: rest.groupId ?? undefined,
+        groupId: targetGroupId ?? undefined,
       },
-      select: { id: true, name: true, phone: true, role: true, isActive: true, groupId: true },
+      select: { id: true, name: true, username: true, phone: true, role: true, isActive: true, groupId: true },
     });
     return res.status(201).json(user);
   } catch (err) {

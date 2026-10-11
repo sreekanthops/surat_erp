@@ -59,11 +59,16 @@ authRouter.post('/login', async (req, res, next) => {
       return res.status(403).json({ error: 'Workspace is suspended. Contact your administrator.', code: 'AUTH_002' });
     }
 
-    // Find user by username within that group
+    // Find user by username, phone, email, or full name within that group
     const user = await prisma.user.findFirst({
       where: {
-        groupId:  group.id,
-        username: { equals: username, mode: 'insensitive' },
+        groupId: group.id,
+        OR: [
+          { username: { equals: username, mode: 'insensitive' } },
+          { phone: { equals: username } },
+          { email: { equals: username, mode: 'insensitive' } },
+          { name: { equals: username, mode: 'insensitive' } },
+        ],
       },
     });
 

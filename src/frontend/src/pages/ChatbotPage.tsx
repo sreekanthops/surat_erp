@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/hooks/useApi';
 import {
   Send, Bot, User, Download, BarChart2, Building2, Phone,
-  CreditCard, ArrowRight, ExternalLink, RefreshCw, X, ShoppingCart, MessageSquare, Package
+  CreditCard, ArrowRight, ExternalLink, RefreshCw, X, ShoppingCart, MessageSquare, Package,
+  Mic, MicOff, Volume2, VolumeX, Sparkles, Radio, Square
 } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
@@ -803,14 +804,33 @@ function CustomerDetailsModal({ customerName, onClose, onNavigateSales }: Custom
   );
 }
 
+// ── Text-to-Speech Markdown Stripper ─────────────────────────────────────────
+function stripMarkdownForTTS(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]/g, '$1') // [Customer Name]
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // **bold**
+    .replace(/\*([^*]+)\*/g, '$1') // *italic*
+    .replace(/`([^`]+)`/g, '$1') // `code`
+    .replace(/₹\s?/g, 'Rupees ') // ₹
+    .replace(/^[-•*]\s+/gm, '') // bullets
+    .replace(/^\d+\.\s+/gm, '') // numbered items
+    .replace(/https?:\/\/\S+/g, '') // urls
+    .replace(/🏢|📊|📱|💡|✅|🎯|✨|🔥|📈|📉|👉|↗/g, '') // emojis
+    .replace(/\n+/g, '. ')
+    .trim();
+}
+
 // ── Main ChatbotPage ──────────────────────────────────────────────────────────
 const DEFAULT_GREETING: Message = {
   role: 'assistant',
-  content: 'Namaste! Main aapka AI business assistant hoon. Aap mujhse apne business ke baare mein kuch bhi pooch sakte hain.\n\n💡 Charts ke liye poochein: "Top products ka bar chart", "Payment status pie chart", "Monthly sales trend"\n💡 WhatsApp leads ke liye: "WhatsApp pe kaun customer ban sakta hai?"',
+  content: 'Namaste! Main aapka AI business assistant hoon. Voice Assistant listening mode ON hai — aap direct bolkar pooch sakte hain ya type kar sakte hain.\n\n💡 Charts: "Top products ka bar chart dikhao", "Monthly sales trend"\n💡 WhatsApp leads: "WhatsApp pe kaun customer ban sakta hai?"',
 };
 
 const STORAGE_CHAT_KEY = 'textileiq_chat_messages_v1';
 const STORAGE_SESSION_KEY = 'textileiq_chat_session_id';
+const STORAGE_VOICE_ENABLED = 'textileiq_voice_assistant_enabled';
+const STORAGE_VOICE_AUTOSPEAK = 'textileiq_voice_autospeak';
+const STORAGE_VOICE_LANG = 'textileiq_voice_lang';
 
 export default function ChatbotPage() {
   const navigate = useNavigate();
@@ -839,6 +859,67 @@ export default function ChatbotPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
 
+  // ── Voice Assistant State (Enabled by default) ──────────────────────────────
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    try {
+      const val = localStorage.getItem(STORAGE_VOICE_ENABLED);
+      return val !== 'false'; // Default enabled = true
+    } catch {
+      return true;
+    }
+  });
+
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
+    try {
+      const val = localStorage.getItem(STORAGE_VOICE_AUTOSPEAK);
+      return val !== 'false'; // Default enabled = true
+    } catch {
+      return true;
+    }
+  });
+
+  const [voiceLang, setVoiceLang] = useState<'en-IN' | 'hi-IN'>(() => {
+    try {
+      return (localStorage.getItem(STORAGE_VOICE_LANG) as any) || 'en-IN';
+    } catch {
+      return 'en-IN';
+    }
+  });
+
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [activeSpeakingIdx, setActiveSpeakingIdx] = useState<number | null>(null);
+
+  const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<any>(null);
+  const isSpeakingRef = useRef(false);
+  const isPendingRef = useRef(false);
+  const voiceEnabledRef = useRef(voiceEnabled);
+  const voiceLangRef = useRef(voiceLang);
+
+  // Sync state to refs & localStorage
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled;
+    try {
+      localStorage.setItem(STORAGE_VOICE_ENABLED, String(voiceEnabled));
+    } catch { /* ignore */ }
+  }, [voiceEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_VOICE_AUTOSPEAK, String(autoSpeak));
+    } catch { /* ignore */ }
+  }, [autoSpeak]);
+
+  useEffect(() => {
+    voiceLangRef.current = voiceLang;
+    try {
+      localStorage.setItem(STORAGE_VOICE_LANG, voiceLang);
+    } catch { /* ignore */ }
+  }, [voiceLang]);
+
   // Sync messages & sessionId to localStorage on update
   useEffect(() => {
     try {
@@ -853,7 +934,188 @@ export default function ChatbotPage() {
     } catch { /* ignore */ }
   }, [sessionId]);
 
+  const isSpeechSupported = typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  // ── Speech Recognition Control ──────────────────────────────────────────────
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch { /* ignore */ }
+    }
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    setIsListening(false);
+    setTranscript('');
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (!isSpeechSupported) {
+      setVoiceError('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+    if (isSpeakingRef.current || isPendingRef.current) return;
+
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) return;
+
+    try {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch { /* ignore */ }
+      }
+
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = voiceLangRef.current;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const item = event.results[i];
+          if (item.isFinal) {
+            final += item[0].transcript;
+          } else {
+            interim += item[0].transcript;
+          }
+        }
+        const captured = (final || interim).trim();
+        if (captured) {
+          setTranscript(captured);
+          setInput(captured);
+
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+          // Auto-send when silence / pause detected after speech
+          silenceTimerRef.current = setTimeout(() => {
+            if (captured && !isPendingRef.current && !isSpeakingRef.current) {
+              send(captured);
+              setTranscript('');
+            }
+          }, final ? 800 : 1500);
+        }
+      };
+
+      recognition.onerror = (e: any) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          setVoiceError('Microphone permission blocked. Please allow mic in browser settings.');
+          setIsListening(false);
+        } else if (e.error === 'no-speech') {
+          // background silence — keep alive
+        } else if (e.error !== 'aborted') {
+          console.warn('Speech recognition notice:', e.error);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        // Continuously restart listening automatically if voice assistant is enabled
+        if (voiceEnabledRef.current && !isSpeakingRef.current && !isPendingRef.current) {
+          setTimeout(() => {
+            if (voiceEnabledRef.current && !isSpeakingRef.current && !isPendingRef.current) {
+              try {
+                recognition.start();
+                setIsListening(true);
+              } catch { /* ignore */ }
+            }
+          }, 300);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+    } catch (err: any) {
+      console.warn('Speech recognition init notice:', err);
+    }
+  }, [isSpeechSupported]);
+
+  // ── Speech Synthesis (TTS) ──────────────────────────────────────────────────
+  const speakText = useCallback((text: string, msgIdx?: number) => {
+    if (!('speechSynthesis' in window)) return;
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* ignore */ }
+    }
+    setIsListening(false);
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    setTranscript('');
+
+    window.speechSynthesis.cancel();
+    const clean = stripMarkdownForTTS(text);
+    if (!clean) return;
+
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+    utterance.lang = voiceLangRef.current;
+
+    const voices = window.speechSynthesis.getVoices();
+    const matchedVoice = voices.find(v => v.lang === voiceLangRef.current)
+      || voices.find(v => v.lang.startsWith(voiceLangRef.current.slice(0, 2)))
+      || voices.find(v => v.lang.startsWith('en'))
+      || voices[0];
+    if (matchedVoice) utterance.voice = matchedVoice;
+
+    isSpeakingRef.current = true;
+    setIsSpeaking(true);
+    if (typeof msgIdx === 'number') setActiveSpeakingIdx(msgIdx);
+
+    const handleEnd = () => {
+      isSpeakingRef.current = false;
+      setIsSpeaking(false);
+      setActiveSpeakingIdx(null);
+      // Seamlessly restart listening after AI finishes speaking
+      if (voiceEnabledRef.current && !isPendingRef.current) {
+        setTimeout(() => {
+          if (voiceEnabledRef.current && !isSpeakingRef.current && !isPendingRef.current) {
+            startListening();
+          }
+        }, 400);
+      }
+    };
+
+    utterance.onend = handleEnd;
+    utterance.onerror = handleEnd;
+
+    window.speechSynthesis.speak(utterance);
+  }, [startListening]);
+
+  const stopSpeaking = useCallback(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    isSpeakingRef.current = false;
+    setIsSpeaking(false);
+    setActiveSpeakingIdx(null);
+    if (voiceEnabledRef.current && !isPendingRef.current) {
+      startListening();
+    }
+  }, [startListening]);
+
+  // Lifecycle: Enable/Disable listening on mount and toggle
+  useEffect(() => {
+    if (voiceEnabled) {
+      startListening();
+    } else {
+      stopListening();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+    return () => {
+      stopListening();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    };
+  }, [voiceEnabled, startListening, stopListening]);
+
   const clearChat = () => {
+    stopSpeaking();
     setMessages([DEFAULT_GREETING]);
     setSessionId(null);
     try {
@@ -870,13 +1132,27 @@ export default function ChatbotPage() {
         history: messages.slice(-8).map((m) => ({ role: m.role, content: m.content })),
       }).then((r) => r.data),
     onSuccess: (data) => {
+      isPendingRef.current = false;
       setSessionId(data.sessionId);
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: data.response, leadCards: data.leadCards, chartData: data.chartData },
       ]);
+
+      if (voiceEnabledRef.current && autoSpeak) {
+        setTimeout(() => {
+          speakText(data.response);
+        }, 200);
+      } else if (voiceEnabledRef.current) {
+        setTimeout(() => {
+          if (voiceEnabledRef.current && !isSpeakingRef.current) {
+            startListening();
+          }
+        }, 300);
+      }
     },
     onError: (err: any) => {
+      isPendingRef.current = false;
       const status = err?.response?.status;
       const detail = err?.response?.data?.error || err?.response?.data?.detail || err?.message;
       const msg = status === 401
@@ -885,16 +1161,48 @@ export default function ChatbotPage() {
         ? 'AI service abhi available nahi hai. Backend check karein.'
         : 'Kuch gadbad ho gayi, dobara try karein.');
       setMessages((prev) => [...prev, { role: 'assistant', content: msg }]);
+
+      if (voiceEnabledRef.current && autoSpeak) {
+        setTimeout(() => {
+          speakText(msg);
+        }, 200);
+      } else if (voiceEnabledRef.current) {
+        setTimeout(() => {
+          startListening();
+        }, 300);
+      }
     },
   });
 
   const send = (text?: string) => {
     const msg = text || input.trim();
     if (!msg || mutation.isPending) return;
+
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    setTranscript('');
+    stopSpeaking();
+
+    isPendingRef.current = true;
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* ignore */ }
+    }
+    setIsListening(false);
+
     setMessages((prev) => [...prev, { role: 'user', content: msg }]);
     setInput('');
     mutation.mutate(msg);
     inputRef.current?.focus();
+  };
+
+  const toggleVoiceAssistant = () => {
+    if (voiceEnabled) {
+      setVoiceEnabled(false);
+      stopListening();
+      stopSpeaking();
+    } else {
+      setVoiceEnabled(true);
+      // startListening will be triggered by useEffect
+    }
   };
 
   useEffect(() => {
@@ -904,29 +1212,85 @@ export default function ChatbotPage() {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
+      <div className="px-6 py-3.5 border-b border-gray-100 bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-blue-200">
             <Bot size={16} className="text-white" />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-gray-900 leading-tight">AI Business Assistant</h1>
-            <p className="text-xs text-gray-400 leading-tight">WhatsApp leads · Charts · Sales · Stock · Payments</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold text-gray-900 leading-tight">AI Business Assistant</h1>
+              {voiceEnabled ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isListening ? 'bg-emerald-500 animate-ping' : 'bg-emerald-400'}`} />
+                  Voice Assistant Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-500">
+                  Voice Off
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 leading-tight">WhatsApp leads · Charts · Sales · Stock · Voice Assistant</p>
           </div>
-          <div className="ml-auto flex items-center gap-3">
+
+          <div className="ml-auto flex items-center gap-2">
+            {/* Voice Assistant Toggle & Options */}
+            <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-1 gap-1">
+              <button
+                onClick={toggleVoiceAssistant}
+                title={voiceEnabled ? 'Voice Assistant is ON (Listening). Click to Disable.' : 'Click to Enable Voice Assistant'}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  voiceEnabled
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                {voiceEnabled ? <Mic size={13} className="animate-pulse" /> : <MicOff size={13} />}
+                <span>{voiceEnabled ? 'Voice ON' : 'Voice OFF'}</span>
+              </button>
+
+              {voiceEnabled && (
+                <>
+                  <button
+                    onClick={() => setAutoSpeak(!autoSpeak)}
+                    title={autoSpeak ? 'Auto read aloud responses is ON' : 'Auto read aloud responses is MUTED'}
+                    className={`p-1.5 rounded-lg text-xs transition-colors ${
+                      autoSpeak ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {autoSpeak ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                  </button>
+
+                  <select
+                    value={voiceLang}
+                    onChange={(e) => setVoiceLang(e.target.value as any)}
+                    className="text-[11px] font-semibold bg-transparent text-gray-600 border-none outline-none cursor-pointer pr-1"
+                    title="Voice recognition language"
+                  >
+                    <option value="en-IN">EN (IN)</option>
+                    <option value="hi-IN">HI (IN)</option>
+                  </select>
+                </>
+              )}
+            </div>
+
             <button
               onClick={clearChat}
               title="Clear chat history"
-              className="text-xs text-gray-400 hover:text-gray-700 px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              className="text-xs text-gray-400 hover:text-gray-700 px-2.5 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
             >
               Clear Chat
             </button>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-              <span className="text-xs text-gray-400">Online</span>
-            </div>
           </div>
         </div>
+
+        {voiceError && (
+          <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 flex items-center justify-between">
+            <span>⚠️ {voiceError}</span>
+            <button onClick={() => setVoiceError(null)} className="text-amber-900 font-bold ml-2">×</button>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -961,8 +1325,36 @@ export default function ChatbotPage() {
                   padding: '12px 16px',
                   boxShadow: '0 1px 8px rgba(15,23,42,0.06)',
                   minWidth: 180,
+                  position: 'relative',
                 }}>
-                  {renderMarkdown(msg.content, (name) => setSelectedCustomer(name))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
+                    <div style={{ flex: 1 }}>
+                      {renderMarkdown(msg.content, (name) => setSelectedCustomer(name))}
+                    </div>
+                    {/* Read aloud button for this message */}
+                    <button
+                      onClick={() => {
+                        if (isSpeaking && activeSpeakingIdx === i) {
+                          stopSpeaking();
+                        } else {
+                          speakText(msg.content, i);
+                        }
+                      }}
+                      title={isSpeaking && activeSpeakingIdx === i ? 'Stop reading' : 'Read aloud'}
+                      style={{
+                        padding: '4px',
+                        background: isSpeaking && activeSpeakingIdx === i ? '#fee2e2' : '#f1f5f9',
+                        color: isSpeaking && activeSpeakingIdx === i ? '#dc2626' : '#64748b',
+                        border: 'none',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        marginLeft: 8,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isSpeaking && activeSpeakingIdx === i ? <Square size={12} /> : <Volume2 size={12} />}
+                    </button>
+                  </div>
 
                   {/* Contextual Quick Navigation Buttons at end of assistant answer */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>
@@ -1071,8 +1463,65 @@ export default function ChatbotPage() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Floating Live Voice Activity Banner */}
+      {voiceEnabled && (transcript || isSpeaking) && (
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-blue-100 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 overflow-hidden">
+            {isSpeaking ? (
+              <span className="flex items-center gap-1.5 text-indigo-700 font-semibold">
+                <Volume2 size={14} className="animate-pulse text-indigo-600" />
+                Assistant is speaking...
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-blue-800 font-medium truncate">
+                <span className="flex gap-0.5 items-center">
+                  <span className="w-1 h-3 bg-blue-500 rounded-full animate-pulse" />
+                  <span className="w-1 h-4 bg-indigo-500 rounded-full animate-pulse" style={{ animationDelay: '0.15s' }} />
+                  <span className="w-1 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+                </span>
+                <span className="font-bold text-blue-900">Listening:</span>
+                <span className="italic truncate">"{transcript}"</span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {isSpeaking ? (
+              <button
+                onClick={stopSpeaking}
+                className="px-2.5 py-1 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Stop Audio
+              </button>
+            ) : transcript ? (
+              <>
+                <button
+                  onClick={() => {
+                    send(transcript);
+                    setTranscript('');
+                  }}
+                  className="px-2.5 py-1 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  Ask Now
+                </button>
+                <button
+                  onClick={() => {
+                    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+                    setTranscript('');
+                    setInput('');
+                  }}
+                  className="px-2 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Clear
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {/* Suggestions */}
-      <div className="px-4 py-2.5 bg-white border-t border-gray-100 flex-shrink-0">
+      <div className="px-4 py-2 bg-white border-t border-gray-100 flex-shrink-0">
         <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
           {suggestions.map((s) => (
             <button
@@ -1088,23 +1537,52 @@ export default function ChatbotPage() {
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3.5 bg-white border-t border-gray-100 flex-shrink-0">
-        <div className="flex gap-2.5 items-center">
+      <div className="px-4 py-3 bg-white border-t border-gray-100 flex-shrink-0">
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={toggleVoiceAssistant}
+            title={voiceEnabled ? 'Voice Assistant is ON & Listening. Click to disable.' : 'Click to enable Voice Assistant'}
+            className={`p-2.5 rounded-xl border transition-all duration-200 flex-shrink-0 ${
+              voiceEnabled
+                ? isListening
+                  ? 'bg-blue-50 border-blue-400 text-blue-600 shadow-sm ring-2 ring-blue-200'
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {voiceEnabled ? (
+              <div className="relative">
+                <Mic size={17} className={isListening ? 'animate-pulse text-blue-600' : 'text-emerald-600'} />
+                {isListening && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+                )}
+              </div>
+            ) : (
+              <MicOff size={17} />
+            )}
+          </button>
+
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder="Kuch bhi poochein — charts, leads, sales, stock..."
+            placeholder={
+              voiceEnabled && isListening
+                ? '🎙️ Listening... Bolkar pooch sakte hain ya type karein...'
+                : 'Kuch bhi poochein — charts, leads, sales, stock...'
+            }
             className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 bg-gray-50 hover:bg-white"
           />
+
           <button
             onClick={() => send()}
             disabled={!input.trim() || mutation.isPending}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors duration-150 flex-shrink-0"
+            className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors duration-150 flex-shrink-0 font-medium text-sm flex items-center gap-1.5 shadow-sm shadow-blue-200"
           >
             <Send size={15} />
+            <span>Ask</span>
           </button>
         </div>
       </div>
